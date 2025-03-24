@@ -3,9 +3,13 @@
 
 Este directorio contiene todos los archivos relacionados con el backend de la aplicación ClassConnect.
 
+## Base de Datos
+
+Para este proyecto se utiliza **MySQL** como sistema gestor de base de datos relacional.
+
 ## Estructura de directorios
 
-- `BD/`: Archivos SQL para la creación y gestión de la base de datos
+- `BD/`: Archivos SQL para la creación y gestión de la base de datos MySQL
   - `schema.sql`: Estructura de la base de datos
   - `sample_data.sql`: Datos de ejemplo para desarrollo y pruebas
   - `queries.sql`: Consultas comunes utilizadas en la aplicación
