@@ -1,4 +1,3 @@
-
 import React, { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -18,15 +17,32 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
+  const validateForm = () => {
+    if (!email.trim()) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa tu correo electrónico.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    if (!password) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa tu contraseña.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    return true;
+  };
+  
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password.",
-        variant: "destructive",
-      });
+    if (!validateForm()) {
       return;
     }
     
@@ -34,10 +50,14 @@ const Login = () => {
       setIsLoading(true);
       await login(email, password);
       navigate('/dashboard');
+      toast({
+        title: "Inicio de Sesión Exitoso",
+        description: "Has ingresado correctamente.",
+      });
     } catch (error) {
       toast({
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        title: "Error de Inicio de Sesión",
+        description: "Correo electrónico o contraseña inválidos. Por favor intenta de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -57,7 +77,7 @@ const Login = () => {
       if (!users.some((u: any) => u.email === demoEmail)) {
         const demoUser = {
           id: role === 'teacher' ? 't-demo' : 's-demo',
-          name: role === 'teacher' ? 'Professor Demo' : 'Student Demo',
+          name: role === 'teacher' ? 'Profesor Demo' : 'Estudiante Demo',
           email: demoEmail,
           password: demoPassword,
           role: role,
@@ -69,10 +89,14 @@ const Login = () => {
       
       await login(demoEmail, demoPassword);
       navigate('/dashboard');
+      toast({
+        title: "Inicio de Sesión Demo",
+        description: `Has ingresado como ${role === 'teacher' ? 'profesor' : 'estudiante'} demo.`,
+      });
     } catch (error) {
       toast({
-        title: "Demo Login Failed",
-        description: "There was an error with the demo login. Please try again.",
+        title: "Error en Inicio de Sesión Demo",
+        description: "Hubo un error con el inicio de sesión demo. Por favor intenta de nuevo.",
         variant: "destructive",
       });
     } finally {

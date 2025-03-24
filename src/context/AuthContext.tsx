@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Check if user already exists
       if (users.some((u: any) => u.email === email)) {
-        throw new Error('User with this email already exists');
+        throw new Error('Ya existe un usuario con este correo electrónico');
       }
       
       // Add user to "database"
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = users.find((u: any) => u.email === email && u.password === password);
       
       if (!user) {
-        throw new Error('Invalid credentials');
+        throw new Error('Credenciales inválidas');
       }
       
       // Set current user (without the password)

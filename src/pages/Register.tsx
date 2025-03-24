@@ -22,24 +22,61 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('student');
   
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!name || !email || !password || !confirmPassword) {
+  const validateForm = () => {
+    if (!name.trim()) {
       toast({
         title: "Error",
-        description: "Please fill in all fields.",
+        description: "Por favor ingresa tu nombre completo.",
         variant: "destructive",
       });
-      return;
+      return false;
+    }
+    
+    if (!email.trim()) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa tu correo electrónico.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa un correo electrónico válido.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "La contraseña debe tener al menos 6 caracteres.",
+        variant: "destructive",
+      });
+      return false;
     }
     
     if (password !== confirmPassword) {
       toast({
         title: "Error",
-        description: "Passwords do not match.",
+        description: "Las contraseñas no coinciden.",
         variant: "destructive",
       });
+      return false;
+    }
+    
+    return true;
+  };
+  
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
       return;
     }
     
@@ -48,13 +85,13 @@ const Register = () => {
       await register(name, email, password, role);
       navigate('/dashboard');
       toast({
-        title: "Registration Successful",
-        description: `Welcome to ClassConnect, ${name}!`,
+        title: "Registro Exitoso",
+        description: `Bienvenido a ClassConnect, ${name}!`,
       });
     } catch (error: any) {
       toast({
-        title: "Registration Failed",
-        description: error.message || "An error occurred during registration.",
+        title: "Error en el Registro",
+        description: error.message || "Ocurrió un error durante el registro.",
         variant: "destructive",
       });
     } finally {
