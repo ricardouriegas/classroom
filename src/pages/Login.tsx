@@ -1,6 +1,6 @@
 
 import React, { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,11 +32,7 @@ const Login = () => {
     
     try {
       setIsLoading(true);
-      
-      // Modify email to reflect role for demo purposes
-      const loginEmail = role === 'teacher' ? `teacher_${email}` : email;
-      
-      await login(loginEmail, password);
+      await login(email, password);
       navigate('/dashboard');
     } catch (error) {
       toast({
@@ -56,6 +51,21 @@ const Login = () => {
       
       const demoEmail = role === 'teacher' ? 'teacher@example.com' : 'student@example.com';
       const demoPassword = 'password123';
+      
+      // Create demo user if it doesn't exist
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      if (!users.some((u: any) => u.email === demoEmail)) {
+        const demoUser = {
+          id: role === 'teacher' ? 't-demo' : 's-demo',
+          name: role === 'teacher' ? 'Professor Demo' : 'Student Demo',
+          email: demoEmail,
+          password: demoPassword,
+          role: role,
+          avatar: `https://i.pravatar.cc/150?img=${role === 'teacher' ? '11' : '12'}`
+        };
+        users.push(demoUser);
+        localStorage.setItem('users', JSON.stringify(users));
+      }
       
       await login(demoEmail, demoPassword);
       navigate('/dashboard');
@@ -95,30 +105,6 @@ const Login = () => {
               <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="role">I am a:</Label>
-                      <div className="flex rounded-md overflow-hidden border">
-                        <Button 
-                          type="button"
-                          variant={role === 'student' ? 'default' : 'outline'}
-                          className={`rounded-none ${role === 'student' ? '' : 'border-0'}`}
-                          onClick={() => setRole('student')}
-                        >
-                          Student
-                        </Button>
-                        <Button 
-                          type="button"
-                          variant={role === 'teacher' ? 'default' : 'outline'}
-                          className={`rounded-none ${role === 'teacher' ? '' : 'border-0'}`}
-                          onClick={() => setRole('teacher')}
-                        >
-                          Teacher
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -151,7 +137,7 @@ const Login = () => {
                   </div>
                 </CardContent>
                 
-                <CardFooter>
+                <CardFooter className="flex flex-col space-y-4">
                   <Button 
                     type="submit" 
                     className="w-full" 
@@ -159,6 +145,13 @@ const Login = () => {
                   >
                     {isLoading ? "Signing In..." : "Sign In"}
                   </Button>
+                  
+                  <div className="text-sm text-center text-gray-500">
+                    Don't have an account?{" "}
+                    <Link to="/register" className="text-primary font-semibold hover:underline">
+                      Create one
+                    </Link>
+                  </div>
                 </CardFooter>
               </form>
             </TabsContent>
