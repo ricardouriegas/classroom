@@ -154,29 +154,44 @@ router.post('/register', async (req, res) => {
       role
     };
 
-    // Antes de firmar el token, aseguramos obtener la clave secreta:
+    // Check for JWT_SECRET before attempting to sign token
     const jwtSecret = process.env.JWT_SECRET;
-
-    // Sign token
-    jwt.sign(
-      payload,
-      jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' },
-      (err, token) => {
-        if (err) {
-          return res.status(500).send({ error: 'Registration error: ' + err.message });
+    if (!jwtSecret) {
+      console.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({
+        error: {
+          message: 'Server configuration error',
+          code: 'SERVER_CONFIG_ERROR'
         }
-        res.status(201).json({
-          token,
-          user: {
-            id: userId,
-            name,
-            email,
-            role
-          }
-        });
-      }
-    );
+      });
+    }
+
+    // Sign token synchronously to better handle errors
+    try {
+      const token = jwt.sign(
+        payload,
+        jwtSecret,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+      );
+      
+      return res.status(201).json({
+        token,
+        user: {
+          id: userId,
+          name,
+          email,
+          role
+        }
+      });
+    } catch (jwtError) {
+      console.error('JWT signing error:', jwtError);
+      return res.status(500).json({
+        error: {
+          message: 'Error generating authentication token',
+          code: 'TOKEN_GENERATION_ERROR'
+        }
+      });
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
