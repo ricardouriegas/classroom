@@ -1,4 +1,3 @@
-
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -60,10 +59,13 @@ router.post('/login', async (req, res) => {
       role: user.role
     };
 
+    // Antes de firmar el token, aseguramos obtener la clave secreta:
+    const jwtSecret = process.env.JWT_SECRET;
+
     // Sign token
     jwt.sign(
       payload,
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' },
       (err, token) => {
         if (err) throw err;
@@ -152,13 +154,18 @@ router.post('/register', async (req, res) => {
       role
     };
 
+    // Antes de firmar el token, aseguramos obtener la clave secreta:
+    const jwtSecret = process.env.JWT_SECRET;
+
     // Sign token
     jwt.sign(
       payload,
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' },
       (err, token) => {
-        if (err) throw err;
+        if (err) {
+          return res.status(500).send({ error: 'Registration error: ' + err.message });
+        }
         res.status(201).json({
           token,
           user: {
