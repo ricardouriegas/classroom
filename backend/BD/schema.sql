@@ -3,7 +3,6 @@
 -- Create database
 CREATE DATABASE IF NOT EXISTS class_connect;
 USE class_connect;
-USE class_connect;
 
 -- Users table (both teachers and students)
 CREATE TABLE IF NOT EXISTS users (
