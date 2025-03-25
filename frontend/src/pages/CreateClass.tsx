@@ -1,63 +1,110 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { classColors } from '@/utils/mockData';
-import { Check, ArrowLeft } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Check } from 'lucide-react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+// Define form validation schema
+const formSchema = z.object({
+  name: z.string().min(3, { message: 'El nombre de la clase debe tener al menos 3 caracteres' }),
+  description: z.string().optional(),
+  career_id: z.string({ required_error: 'Seleccione una carrera' }),
+  semester: z.string().min(1, { message: 'Ingrese el cuatrimestre' }),
+});
+
+type Career = {
+  id: string;
+  name: string;
+};
 
 const CreateClass = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [careers, setCareers] = useState<Career[]>([]);
   
-  const [formData, setFormData] = useState({
-    name: '',
-    section: '',
-    subject: '',
-    description: '',
-    colorIndex: 0,
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      semester: '',
+    },
   });
   
+  // Fetch careers when component mounts
+  useEffect(() => {
+    const fetchCareers = async () => {
+      try {
+        // In production, this would be an API call to get careers
+        // For now we'll use some mock data until the careers endpoint is implemented
+        const mockCareers = [
+          { id: '1', name: 'Ingeniería en Sistemas' },
+          { id: '2', name: 'Licenciatura en Administración' },
+          { id: '3', name: 'Ingeniería Industrial' },
+          { id: '4', name: 'Licenciatura en Contaduría' },
+        ];
+        setCareers(mockCareers);
+        
+        // Uncomment when the careers API endpoint is available
+        // const response = await api.get('/careers');
+        // setCareers(response.data);
+      } catch (error) {
+        console.error('Error fetching careers:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las carreras. Por favor, inténtelo de nuevo.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchCareers();
+  }, [toast]);
+  
+  // Check if user is a teacher, otherwise redirect
   if (!currentUser || currentUser.role !== 'teacher') {
     navigate('/dashboard');
     return null;
   }
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleColorChange = (index: number) => {
-    setFormData(prev => ({ ...prev, colorIndex: index }));
-  };
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Submit handler
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
     
-    if (!formData.name.trim()) {
+    try {
+      // Call backend API to create class
+      const response = await api.post('/classes', values);
+      
+      toast({
+        title: "¡Éxito!",
+        description: `La clase "${values.name}" ha sido creada correctamente.`,
+      });
+      
+      // Redirect to the dashboard
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Error creating class:', error);
       toast({
         title: "Error",
-        description: "Class name is required.",
+        description: error.response?.data?.error?.message || "Ocurrió un error al crear la clase. Por favor, inténtelo de nuevo.",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    toast({
-      title: "Success!",
-      description: `Class "${formData.name}" has been created.`,
-    });
-    
-    navigate('/dashboard');
   };
   
   return (
@@ -71,103 +118,130 @@ const CreateClass = () => {
           onClick={() => navigate('/dashboard')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
+          Volver al Panel
         </Button>
         
         <Card className="animate-fade-in">
           <CardHeader>
-            <CardTitle className="text-2xl">Create Class</CardTitle>
+            <CardTitle className="text-2xl">Crear Clase</CardTitle>
             <CardDescription>
-              Fill in the details to create a new class for your students.
+              Complete los detalles para crear una nueva clase para sus estudiantes.
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Class Name <span className="text-red-500">*</span></Label>
-                <Input 
-                  id="name" 
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <CardContent className="space-y-6">
+                <FormField
+                  control={form.control}
                   name="name"
-                  placeholder="e.g., Introduction to Biology"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre de la Clase <span className="text-red-500">*</span></FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ej: Programación Web"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="section">Section</Label>
-                  <Input 
-                    id="section" 
-                    name="section"
-                    placeholder="e.g., Period 1"
-                    value={formData.section}
-                    onChange={handleInputChange}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="career_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Carrera <span className="text-red-500">*</span></FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione una carrera" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {careers.map((career) => (
+                              <SelectItem key={career.id} value={career.id}>
+                                {career.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="semester"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cuatrimestre <span className="text-red-500">*</span></FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ej: 2023-B"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input 
-                    id="subject" 
-                    name="subject"
-                    placeholder="e.g., Science"
-                    value={formData.subject}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea 
-                  id="description" 
+                <FormField
+                  control={form.control}
                   name="description"
-                  placeholder="Provide a description of your class..."
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="min-h-[100px]"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripción</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Descripción del curso, objetivos, etc."
+                          className="min-h-[100px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Proporcione una descripción para ayudar a los estudiantes a entender el contenido de la clase.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
+              </CardContent>
               
-              <div className="space-y-2">
-                <Label>Class Theme Color</Label>
-                <div className="flex flex-wrap gap-3">
-                  {classColors.map((color, index) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`w-12 h-12 rounded-full relative transition-transform ${
-                        formData.colorIndex === index ? 'scale-110 shadow-md' : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => handleColorChange(index)}
-                      aria-label={`Select color ${index + 1}`}
-                    >
-                      {formData.colorIndex === index && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Check className="text-white h-6 w-6" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-            
-            <CardFooter className="flex justify-between">
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => navigate('/dashboard')}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Create Class</Button>
-            </CardFooter>
-          </form>
+              <CardFooter className="flex justify-between">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creando...
+                    </span>
+                  ) : (
+                    "Crear Clase"
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
         </Card>
       </main>
     </div>
