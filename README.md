@@ -1,69 +1,80 @@
-# Welcome to your Lovable project
 
-## Project info
+# ClassConnect - Sistema de Gestión Educativa Virtual
 
-**URL**: https://lovable.dev/projects/54a7403b-6834-4e07-9fa8-7d18287676fa
+ClassConnect es un sistema integral de gestión educativa virtual que facilita la administración de clases, comunicación entre profesores y alumnos, y la gestión de materiales y tareas académicas, emulando las funcionalidades principales de Google Classroom.
 
-## How can I edit this code?
+## Estructura del Proyecto
 
-There are several ways of editing your application.
+El proyecto está dividido en dos partes principales:
 
-**Use Lovable**
+- **frontend/**: Aplicación React para profesores y alumnos
+- **backend/**: API RESTful para servir la aplicación frontend
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/54a7403b-6834-4e07-9fa8-7d18287676fa) and start prompting.
+## Requisitos del Sistema
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 14.x o superior
+- MySQL 8.0 o superior
+- Navegador web moderno (Chrome, Firefox, Safari, Edge)
 
-**Use your preferred IDE**
+## Configuración del Proyecto
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Instalación General
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone el repositorio:
+```bash
+git clone <URL-DEL-REPOSITORIO>
+cd classconnect
+```
 
-Follow these steps:
+## Frontend
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+La aplicación frontend está desarrollada con React, TypeScript y Tailwind CSS, proporcionando interfaces diferenciadas para profesores y alumnos.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Características Frontend
 
-# Step 3: Install the necessary dependencies.
-npm i
+- Interfaces específicas para profesores y alumnos
+- Diseño responsivo compatible con dispositivos móviles y de escritorio
+- Consumo de API RESTful del backend mediante peticiones HTTP
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Instalación y Ejecución del Frontend
+
+```bash
+# Navegar al directorio frontend
+cd frontend
+
+# Instalar dependencias
+npm install
+
+# Ejecutar en modo desarrollo
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+La aplicación estará disponible en http://localhost:8080
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Backend
 
-**Use GitHub Codespaces**
+El backend está implementado como una API RESTful que proporciona los datos necesarios para la aplicación frontend.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Características Backend
 
-## What technologies are used for this project?
+- API RESTful para gestionar todos los recursos del sistema
+- Sistema de autenticación con roles diferenciados (profesor/alumno)
+- Base de datos MySQL para almacenamiento persistente
+- Gestión de archivos para materiales y tareas
 
-This project is built with .
+### Instalación y Ejecución del Backend
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+# Configurar la base de datos
+# 1. Crear una base de datos MySQL
+# 2. Ejecutar el script de creación de tablas:
+mysql -u usuario -p nombre_base_datos < backend/BD/schema.sql
+# 3. (Opcional) Cargar datos de ejemplo:
+mysql -u usuario -p nombre_base_datos < backend/BD/sample_data.sql
+```
 
-## How can I deploy this project?
+La documentación detallada de la API está disponible en el archivo [backend/README.md](backend/README.md).
 
-Simply open [Lovable](https://lovable.dev/projects/54a7403b-6834-4e07-9fa8-7d18287676fa) and click on Share -> Publish.
+## Licencia
 
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+Este proyecto está licenciado bajo la Licencia MIT - vea el archivo LICENSE para más detalles.
