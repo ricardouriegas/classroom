@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/db');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -63,7 +64,7 @@ router.post('/login', async (req, res) => {
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' },
       (err, token) => {
         if (err) throw err;
         res.json({
@@ -131,7 +132,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Generate user ID (UUID v4 format)
-    const userId = require('crypto').randomUUID();
+    const userId = crypto.randomUUID();
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
@@ -155,7 +156,7 @@ router.post('/register', async (req, res) => {
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' },
       (err, token) => {
         if (err) throw err;
         res.status(201).json({

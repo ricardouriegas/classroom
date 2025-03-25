@@ -1,5 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+
+// Define API URLs
+const API_URL = 'http://localhost:3000/api';
 
 // Define user types
 export type UserRole = 'teacher' | 'student';
@@ -9,7 +13,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  avatar?: string;
+  avatar_url?: string;
 }
 
 interface AuthContextType {
@@ -24,65 +28,72 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Set up axios instance for authorization headers
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Add interceptor to add auth token to requests
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Check for existing user on load
+  // Check for existing auth token on load
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (token && userData) {
+        try {
+          setCurrentUser(JSON.parse(userData));
+          // In a production app, we would verify the token with the server here
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      
+      setIsLoading(false);
+    };
+    
+    checkAuth();
   }, []);
-  
-  // Save user to localStorage when it changes
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('user');
-    }
-  }, [currentUser]);
   
   // Registration function
   const register = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, we would make an API call to create a user
-      // For now, we'll just create a mock user ID
-      const userId = role === 'teacher' ? 't' + Date.now() : 's' + Date.now();
-      
-      // Create new user
-      const newUser: User = {
-        id: userId,
+      const response = await api.post('/auth/register', {
         name,
         email,
-        role,
-        avatar: `https://i.pravatar.cc/150?u=${email}`  // Generate random avatar
-      };
-      
-      // Store users in localStorage for demo purposes (In real app, this would be in database)
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      
-      // Check if user already exists
-      if (users.some((u: any) => u.email === email)) {
-        throw new Error('Ya existe un usuario con este correo electrónico');
-      }
-      
-      // Add user to "database"
-      users.push({
-        ...newUser,
-        password // In a real app, this would be hashed
+        password,
+        role
       });
-      localStorage.setItem('users', JSON.stringify(users));
       
-      // Auto login after registration
-      setCurrentUser(newUser);
+      const { token, user } = response.data;
+      
+      // Store token and user data
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Set user state
+      setCurrentUser(user);
     } catch (error) {
       console.error('Registration failed', error);
       throw error;
@@ -91,24 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  // Mock login function - Now checks against "database" of registered users
+  // Login function
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.post('/auth/login', {
+        email,
+        password
+      });
       
-      // Get users from localStorage
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = users.find((u: any) => u.email === email && u.password === password);
+      const { token, user } = response.data;
       
-      if (!user) {
-        throw new Error('Credenciales inválidas');
-      }
+      // Store token and user data
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
       
-      // Set current user (without the password)
-      const { password: _, ...userWithoutPassword } = user;
-      setCurrentUser(userWithoutPassword);
+      // Set user state
+      setCurrentUser(user);
     } catch (error) {
       console.error('Login failed', error);
       throw error;
@@ -118,8 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
   
   const logout = () => {
-    setCurrentUser(null);
+    // Clear stored data
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setCurrentUser(null);
   };
   
   const value = {
@@ -142,3 +154,6 @@ export function useAuth() {
   }
   return context;
 }
+
+// Export the API instance for use in other components
+export { api };

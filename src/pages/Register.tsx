@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { BookOpen, User, LockKeyhole, Mail, UserPlus } from 'lucide-react';
+import { BookOpen, User, LockKeyhole, Mail } from 'lucide-react';
 import { UserRole } from '@/context/AuthContext';
+import axios from 'axios';
 
 const Register = () => {
   const { register } = useAuth();
@@ -89,9 +90,16 @@ const Register = () => {
         description: `Bienvenido a ClassConnect, ${name}!`,
       });
     } catch (error: any) {
+      let errorMessage = "Ocurrió un error durante el registro.";
+      
+      if (axios.isAxiosError(error) && error.response) {
+        // Get error message from API response if available
+        errorMessage = error.response.data?.error?.message || errorMessage;
+      }
+      
       toast({
         title: "Error en el Registro",
-        description: error.message || "Ocurrió un error durante el registro.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

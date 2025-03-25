@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, User, LockKeyhole, Mail } from 'lucide-react';
+import axios from 'axios';
 
 const Login = () => {
   const { login } = useAuth();
@@ -54,10 +55,16 @@ const Login = () => {
         title: "Inicio de Sesión Exitoso",
         description: "Has ingresado correctamente.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      let errorMessage = "Error al iniciar sesión. Por favor intenta de nuevo.";
+      
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data?.error?.message || errorMessage;
+      }
+      
       toast({
         title: "Error de Inicio de Sesión",
-        description: "Correo electrónico o contraseña inválidos. Por favor intenta de nuevo.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -72,21 +79,6 @@ const Login = () => {
       const demoEmail = role === 'teacher' ? 'teacher@example.com' : 'student@example.com';
       const demoPassword = 'password123';
       
-      // Create demo user if it doesn't exist
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      if (!users.some((u: any) => u.email === demoEmail)) {
-        const demoUser = {
-          id: role === 'teacher' ? 't-demo' : 's-demo',
-          name: role === 'teacher' ? 'Profesor Demo' : 'Estudiante Demo',
-          email: demoEmail,
-          password: demoPassword,
-          role: role,
-          avatar: `https://i.pravatar.cc/150?img=${role === 'teacher' ? '11' : '12'}`
-        };
-        users.push(demoUser);
-        localStorage.setItem('users', JSON.stringify(users));
-      }
-      
       await login(demoEmail, demoPassword);
       navigate('/dashboard');
       toast({
@@ -96,7 +88,7 @@ const Login = () => {
     } catch (error) {
       toast({
         title: "Error en Inicio de Sesión Demo",
-        description: "Hubo un error con el inicio de sesión demo. Por favor intenta de nuevo.",
+        description: "Hubo un error con el inicio de sesión demo. Por favor verifica que los usuarios demo existan en la base de datos.",
         variant: "destructive",
       });
     } finally {

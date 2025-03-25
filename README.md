@@ -1,80 +1,121 @@
 
-# ClassConnect - Sistema de Gestión Educativa Virtual
+# ClassConnect - Educational Platform
 
-ClassConnect es un sistema integral de gestión educativa virtual que facilita la administración de clases, comunicación entre profesores y alumnos, y la gestión de materiales y tareas académicas, emulando las funcionalidades principales de Google Classroom.
+ClassConnect is a full-stack educational platform that connects teachers and students, allowing for class management, material sharing, and assignment submissions.
 
-## Estructura del Proyecto
+## Project Structure
 
-El proyecto está dividido en dos partes principales:
+This project is divided into two main parts:
 
-- **frontend/**: Aplicación React para profesores y alumnos
-- **backend/**: API RESTful para servir la aplicación frontend
+- **Frontend**: React application with TypeScript and Tailwind CSS
+- **Backend**: Node.js/Express API with MySQL database
 
-## Requisitos del Sistema
+Each part has its own directory, dependencies, and can be run independently.
 
-- Node.js 14.x o superior
-- MySQL 8.0 o superior
-- Navegador web moderno (Chrome, Firefox, Safari, Edge)
+## Requirements
 
-## Configuración del Proyecto
+- Node.js (v14 or higher)
+- MySQL (v8 or higher)
 
-### Instalación General
+## Setup
 
-1. Clone el repositorio:
-```bash
-git clone <URL-DEL-REPOSITORIO>
-cd classconnect
+### Database Setup
+
+1. Create a MySQL database named `class_connect`
+2. Import the schema:
+   ```
+   mysql -u [username] -p class_connect < src/backend/BD/schema.sql
+   ```
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```
+   cd backend
+   ```
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Copy `.env.example` to `.env` and update the values:
+   ```
+   cp .env.example .env
+   ```
+4. Update the database connection details in the `.env` file
+5. Create demo users (optional):
+   ```
+   npm run create-demo-users
+   ```
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+   ```
+   cd frontend
+   ```
+2. Install dependencies:
+   ```
+   npm install
+   ```
+
+## Running the Application
+
+You need to run both the backend and frontend in separate terminal windows.
+
+### Backend
+
+From the backend directory:
+
 ```
-
-## Frontend
-
-La aplicación frontend está desarrollada con React, TypeScript y Tailwind CSS, proporcionando interfaces diferenciadas para profesores y alumnos.
-
-### Características Frontend
-
-- Interfaces específicas para profesores y alumnos
-- Diseño responsivo compatible con dispositivos móviles y de escritorio
-- Consumo de API RESTful del backend mediante peticiones HTTP
-
-### Instalación y Ejecución del Frontend
-
-```bash
-# Navegar al directorio frontend
-cd frontend
-
-# Instalar dependencias
-npm install
-
-# Ejecutar en modo desarrollo
+cd backend
 npm run dev
 ```
 
-La aplicación estará disponible en http://localhost:8080
+The backend server will run on port 3000 by default.
 
-## Backend
+### Frontend
 
-El backend está implementado como una API RESTful que proporciona los datos necesarios para la aplicación frontend.
+From the frontend directory:
 
-### Características Backend
-
-- API RESTful para gestionar todos los recursos del sistema
-- Sistema de autenticación con roles diferenciados (profesor/alumno)
-- Base de datos MySQL para almacenamiento persistente
-- Gestión de archivos para materiales y tareas
-
-### Instalación y Ejecución del Backend
-
-```bash
-# Configurar la base de datos
-# 1. Crear una base de datos MySQL
-# 2. Ejecutar el script de creación de tablas:
-mysql -u usuario -p nombre_base_datos < backend/BD/schema.sql
-# 3. (Opcional) Cargar datos de ejemplo:
-mysql -u usuario -p nombre_base_datos < backend/BD/sample_data.sql
+```
+cd frontend
+npm run dev
 ```
 
-La documentación detallada de la API está disponible en el archivo [backend/README.md](backend/README.md).
+The frontend application will run on port 5173 by default and can be accessed at http://localhost:5173.
 
-## Licencia
+## Demo Users
 
-Este proyecto está licenciado bajo la Licencia MIT - vea el archivo LICENSE para más detalles.
+After running the `create-demo-users` script, the following demo accounts will be available:
+
+- **Teacher**:
+  - Email: teacher@example.com
+  - Password: password123
+
+- **Student**:
+  - Email: student@example.com
+  - Password: password123
+
+## Features
+
+- User authentication (login/register)
+- Different interfaces for teachers and students
+- Class management
+- Topics and materials
+- Assignments and submissions
+
+## Technology Stack
+
+- **Frontend**:
+  - React with TypeScript
+  - Tailwind CSS
+  - Shadcn UI components
+  - React Router
+  - Axios for API calls
+
+- **Backend**:
+  - Node.js with Express
+  - MySQL database
+  - JWT authentication
+  - Multer for file uploads
+
