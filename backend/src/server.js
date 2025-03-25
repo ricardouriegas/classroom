@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -9,6 +8,7 @@ const authRoutes = require('./routes/auth.routes');
 const classesRoutes = require('./routes/classes.routes');
 const topicsRoutes = require('./routes/topics.routes');
 const careersRoutes = require('./routes/careers.routes');
+const announcementsRoutes = require('./routes/announcements.routes');
 
 // Initialize express app
 const app = express();
@@ -26,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/classes', classesRoutes);
 app.use('/api/topics', topicsRoutes);
 app.use('/api/careers', careersRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 // Root route
 app.get('/', (req, res) => {

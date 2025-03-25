@@ -1,4 +1,3 @@
-
 import { User, UserRole } from '../context/AuthContext';
 
 // Class (Course) type
@@ -15,6 +14,16 @@ export interface Class {
   enrollmentCode: string;
   students: string[]; // Array of student IDs
   createdAt: Date;
+}
+
+// Attachment type
+export interface Attachment {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedAt: Date;
 }
 
 // Announcement type
@@ -55,15 +64,6 @@ export interface Submission {
   grade?: number;
   feedback?: string;
   attachments?: Attachment[];
-}
-
-// Attachment type
-export interface Attachment {
-  id: string;
-  name: string;
-  type: string;
-  url: string;
-  size: number;
 }
 
 // Comment type
