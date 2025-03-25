@@ -93,7 +93,7 @@ const Navbar: React.FC = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-9 w-9 transition-transform hover:scale-105">
-                    <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
+                    <AvatarImage src={currentUser.avatar || currentUser.avatar_url} alt={currentUser.name} />
                     <AvatarFallback>{getInitials(currentUser.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
