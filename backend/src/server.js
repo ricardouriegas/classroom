@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
+const { testConnection } = require('./config/db');
+const { handleUploadError } = require('./utils/fileUpload');
 
 // Load environment variables
 dotenv.config();
@@ -23,11 +25,13 @@ app.get('/', (req, res) => {
   res.json({ message: 'ClassConnect API running' });
 });
 
-// TODO: Import and use route modules
-// app.use('/api/auth', require('./routes/auth.routes'));
-// app.use('/api/classes', require('./routes/classes.routes'));
-// app.use('/api/topics', require('./routes/topics.routes'));
-// app.use('/api/assignments', require('./routes/assignments.routes'));
+// Import and use route modules
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/classes', require('./routes/classes.routes'));
+app.use('/api/topics', require('./routes/topics.routes'));
+
+// File upload error handling
+app.use(handleUploadError);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -42,6 +46,9 @@ app.use((err, req, res, next) => {
 
 // Set port and start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Test database connection
+  await testConnection();
 });
