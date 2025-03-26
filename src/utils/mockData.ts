@@ -25,6 +25,8 @@ export interface Class {
   teacher_id: string;
   students_count?: number;
   created_at: string;
+  // Added property for UI color
+  color?: string;
 }
 
 export interface DashboardConfig {
@@ -80,5 +82,61 @@ export const mockAnnouncements: Announcement[] = [
     authorAvatar: "https://randomuser.me/api/portraits/men/32.jpg",
     attachments: [],
     createdAt: new Date(2023, 5, 18)
+  }
+];
+
+// New Assignment interface
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: Date | string;
+  classId: string;
+}
+
+// New mock data exports:
+export const mockClasses: Class[] = [
+  {
+    id: "class1",
+    name: "Mathematics",
+    description: "Math class description",
+    class_code: "MATH101",
+    career_id: "C1",
+    career_name: "Science",
+    semester: "Fall 2023",
+    teacher_id: "teacher-1",
+    students_count: 20,
+    created_at: "2023-01-01",
+    color: "#4285F4"
+  },
+  {
+    id: "class2",
+    name: "Physics",
+    description: "Physics class description",
+    class_code: "PHY101",
+    career_id: "C2",
+    career_name: "Science",
+    semester: "Spring 2023",
+    teacher_id: "teacher-1",
+    students_count: 15,
+    created_at: "2023-02-01",
+    color: "#34A853"
+  }
+];
+
+export const mockAssignments: Assignment[] = [
+  {
+    id: "assign1",
+    title: "Assignment 1",
+    description: "Do math homework",
+    dueDate: new Date(2023, 5, 1),
+    classId: "class1"
+  },
+  {
+    id: "assign2",
+    title: "Assignment 2",
+    description: "Complete physics experiment",
+    dueDate: new Date(2023, 5, 5),
+    classId: "class2"
   }
 ];
