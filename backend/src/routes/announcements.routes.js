@@ -2,7 +2,7 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
-const { uploadMiddleware, getFileUrl } = require('../utils/fileUpload');
+const { upload, getFileUrl } = require('../utils/fileUpload');
 const crypto = require('crypto');
 const path = require('path');
 
@@ -13,7 +13,7 @@ const router = express.Router();
  * @desc    Create a new announcement with optional attachments
  * @access  Private (Teachers only)
  */
-router.post('/', authMiddleware, uploadMiddleware.array('attachments', 5), async (req, res) => {
+router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res) => {
   try {
     const { class_id, title, content } = req.body;
     const userId = req.user.id;
