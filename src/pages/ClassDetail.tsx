@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChevronLeft, Users, FileText, Layers, BookOpen } from 'lucide-react';
 import StudentsSection from '@/components/StudentsSection';
 import AnnouncementsSection from '@/components/AnnouncementsSection';
+import TopicsSection from '@/components/TopicsSection';
 
 interface ClassDetails {
   id: string;
@@ -164,15 +165,7 @@ const ClassDetail = () => {
           </TabsContent>
 
           <TabsContent value="content" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Course Content</CardTitle>
-                <CardDescription>Course materials and resources</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Content section is under development.</p>
-              </CardContent>
-            </Card>
+            {id && <TopicsSection classId={id} />}
           </TabsContent>
 
           <TabsContent value="assignments" className="space-y-4">
@@ -188,7 +181,7 @@ const ClassDetail = () => {
           </TabsContent>
 
           <TabsContent value="students" className="space-y-4">
-            <StudentsSection classId={id!} isTeacher={currentUser?.role === 'teacher'} />
+            {id && <StudentsSection classId={id} isTeacher={currentUser?.role === 'teacher'} />}
           </TabsContent>
         </Tabs>
       </main>
