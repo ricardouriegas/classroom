@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -7,8 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockAnnouncements } from '@/utils/mockData';
-import AnnouncementCard from '@/components/AnnouncementCard';
+import ClassCard from '@/components/ClassCard';
 import { 
   BookOpen, 
   Clock, 
@@ -31,7 +31,16 @@ interface ClassData {
   semester: string;
   teacher_id: string;
   teacher_name: string;
-  created_at: string;
+}
+
+// Define interface for assignment data
+interface Assignment {
+  id: string;
+  title: string;
+  className: string;
+  classId: string;
+  dueDate: string;
+  status: 'pending' | 'submitted' | 'expired';
 }
 
 const StudentDashboard = () => {
@@ -41,15 +50,8 @@ const StudentDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [studentClasses, setStudentClasses] = useState<ClassData[]>([]);
-  
-  // Get pending assignments for the student (mock data - in real app would come from API)
-  const pendingAssignments = [
-    { id: 'a1', title: 'Tarea 1: Introducción', className: 'Programación Web', dueDate: new Date(2023, 5, 20), status: 'pending' },
-    { id: 'a2', title: 'Actividad: Base de datos', className: 'Bases de Datos', dueDate: new Date(2023, 5, 18), status: 'pending' },
-    { id: 'a3', title: 'Proyecto Final', className: 'Programación Web', dueDate: new Date(2023, 4, 30), status: 'expired' },
-  ];
-  
-  // Get recent announcements for student's classes
+  const [pendingAssignments, setPendingAssignments] = useState<Assignment[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState([]);
   
   // Fetch classes from API when component mounts
@@ -73,34 +75,44 @@ const StudentDashboard = () => {
     };
 
     fetchClasses();
+    fetchAssignments();
   }, [toast]);
+  
+  // Fetch assignments from API
+  const fetchAssignments = async () => {
+    try {
+      setIsLoadingAssignments(true);
+      const response = await api.get('/assignments/student');
+      
+      // Format assignments
+      const formattedAssignments = response.data.map((assignment: any) => ({
+        id: assignment.id,
+        title: assignment.title,
+        className: assignment.className,
+        classId: assignment.classId,
+        dueDate: assignment.dueDate,
+        status: assignment.status,
+      }));
+      
+      setPendingAssignments(formattedAssignments);
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      // Use mock data if API fails
+      const mockAssignments = [
+        { id: 'a1', title: 'Tarea 1: Introducción', className: 'Programación Web', classId: 'c1', dueDate: new Date(Date.now() + 86400000 * 2).toISOString(), status: 'pending' },
+        { id: 'a2', title: 'Actividad: Base de datos', className: 'Bases de Datos', classId: 'c2', dueDate: new Date(Date.now() + 86400000 * 1).toISOString(), status: 'pending' },
+        { id: 'a3', title: 'Proyecto Final', className: 'Programación Web', classId: 'c1', dueDate: new Date(Date.now() - 86400000 * 2).toISOString(), status: 'expired' },
+      ];
+      setPendingAssignments(mockAssignments);
+    } finally {
+      setIsLoadingAssignments(false);
+    }
+  };
   
   if (!currentUser || currentUser.role !== 'student') return null;
   
-  // Function to generate color based on class name
-  const getClassColor = (className: string): string => {
-    const colors = [
-      '#4285F4', // Blue
-      '#34A853', // Green
-      '#FBBC05', // Yellow
-      '#EA4335', // Red
-      '#8E24AA', // Purple
-      '#16A2B8', // Teal
-      '#FF7043', // Deep Orange
-      '#6B7280', // Gray
-    ];
-    
-    // Simple hash function to get consistent color for same class name
-    let hash = 0;
-    for (let i = 0; i < className.length; i++) {
-      hash = className.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    return colors[Math.abs(hash) % colors.length];
-  };
-  
   // Handle joining a class
-  const handleJoinClass = () => {
+  const handleJoinClass = async () => {
     if (!joinCode.trim()) {
       toast({
         title: "Error",
@@ -110,14 +122,36 @@ const StudentDashboard = () => {
       return;
     }
     
-    // In real app, this would be an API call to join the class
-    toast({
-      title: "¡Genial!",
-      description: `Te has unido a la clase con el código ${joinCode}.`,
+    try {
+      const response = await api.post('/enrollments/join', { classCode: joinCode });
+      
+      toast({
+        title: "¡Genial!",
+        description: `Te has unido a la clase con el código ${joinCode}.`,
+      });
+      
+      // Add the new class to the list
+      setStudentClasses([...studentClasses, response.data]);
+      
+      setJoinCode('');
+      setDialogOpen(false);
+    } catch (error) {
+      console.error('Error joining class:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo unir a la clase. Verifica que el código sea correcto.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
     });
-    
-    setJoinCode('');
-    setDialogOpen(false);
   };
 
   return (
@@ -183,31 +217,7 @@ const StudentDashboard = () => {
               ) : studentClasses.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {studentClasses.map(classItem => (
-                    <Link to={`/class/${classItem.id}`} key={classItem.id} className="block hover:no-underline">
-                      <Card className="h-full hover:shadow-md transition-shadow overflow-hidden border border-gray-200">
-                        <div 
-                          className="p-4 h-24 flex flex-col justify-between"
-                          style={{ backgroundColor: getClassColor(classItem.name), color: '#ffffff' }}
-                        >
-                          <div className="flex justify-between items-start">
-                            <h3 className="font-semibold text-lg line-clamp-1">{classItem.name}</h3>
-                            <BookOpen className="h-5 w-5 opacity-80" />
-                          </div>
-                          
-                          <p className="opacity-90 text-sm">{classItem.semester}</p>
-                        </div>
-                        
-                        <CardContent className="p-4 space-y-3">
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Carrera:</span> {classItem.career_name}
-                          </p>
-                          
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Profesor:</span> {classItem.teacher_name}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                    <ClassCard key={classItem.id} classData={classItem} />
                   ))}
                 </div>
               ) : (
@@ -227,7 +237,24 @@ const StudentDashboard = () => {
             </TabsContent>
             
             <TabsContent value="assignments" className="mt-2">
-              {pendingAssignments.length > 0 ? (
+              {isLoadingAssignments ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardHeader className="pb-2">
+                        <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                      </CardHeader>
+                      <CardContent className="py-2">
+                        <div className="h-4 bg-slate-200 rounded w-full"></div>
+                      </CardContent>
+                      <CardFooter>
+                        <div className="h-10 bg-slate-200 rounded w-32 ml-auto"></div>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : pendingAssignments.length > 0 ? (
                 <div className="space-y-4">
                   {pendingAssignments.map(assignment => (
                     <Card 
@@ -255,8 +282,8 @@ const StudentDashboard = () => {
                             <Clock className="h-4 w-4 mr-1" />
                             <span className={assignment.status === 'expired' ? 'text-red-500' : 'text-gray-500'}>
                               {assignment.status === 'expired' 
-                                ? `Vencido el ${assignment.dueDate.toLocaleDateString()}` 
-                                : `Vence el ${assignment.dueDate.toLocaleDateString()}`}
+                                ? `Vencido el ${formatDate(assignment.dueDate)}` 
+                                : `Vence el ${formatDate(assignment.dueDate)}`}
                             </span>
                           </div>
                         </div>
@@ -267,8 +294,11 @@ const StudentDashboard = () => {
                           size="sm" 
                           className="ml-auto"
                           disabled={assignment.status === 'expired'}
+                          asChild
                         >
-                          {assignment.status === 'expired' ? 'Ver Detalles' : 'Entregar'}
+                          <Link to={`/class/${assignment.classId}`}>
+                            {assignment.status === 'expired' ? 'Ver Detalles' : 'Entregar'}
+                          </Link>
                         </Button>
                       </CardFooter>
                     </Card>
@@ -343,6 +373,18 @@ const StudentDashboard = () => {
                   {pendingAssignments.filter(a => a.status === 'expired').length}
                 </span>
               </div>
+              
+              <div className="flex justify-center mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full flex items-center justify-center gap-1"
+                  onClick={fetchAssignments}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Actualizar datos
+                </Button>
+              </div>
             </CardContent>
           </Card>
           
@@ -355,7 +397,7 @@ const StudentDashboard = () => {
               <ul className="space-y-3">
                 {pendingAssignments
                   .filter(a => a.status === 'pending')
-                  .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+                  .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
                   .slice(0, 3)
                   .map(assignment => (
                     <li key={assignment.id} className="flex items-start gap-2">
@@ -364,7 +406,7 @@ const StudentDashboard = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">
-                          {assignment.dueDate.toLocaleDateString()} - {assignment.className}
+                          {formatDate(assignment.dueDate)} - {assignment.className}
                         </p>
                         <p className="text-sm font-medium">{assignment.title}</p>
                       </div>

@@ -1,53 +1,74 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, UserPlus, X, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+
+import React, { useState, useEffect } from 'react';
+import { useAuth, api } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Search, Plus, UserPlus, UserX, AlertTriangle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Student {
   id: string;
   name: string;
   email: string;
   avatarUrl?: string;
-  enrollmentDate?: Date;
+  enrollmentDate?: string;
 }
 
-export default function StudentsSection() {
-  const { id: classId } = useParams<{ id: string }>();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [searchResults, setSearchResults] = useState<Student[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+interface StudentsSection2Props {
+  classId: string;
+  isTeacher: boolean;
+}
 
-  // Load enrolled students
+const StudentsSection: React.FC<StudentsSection2Props> = ({ classId, isTeacher }) => {
+  const { toast } = useToast();
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [searchResults, setSearchResults] = useState<Student[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
   useEffect(() => {
-    fetchStudents();
+    fetchEnrolledStudents();
   }, [classId]);
 
-  const fetchStudents = async () => {
+  const fetchEnrolledStudents = async () => {
     if (!classId) return;
-    
+
     try {
       setIsLoading(true);
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/enrollments/class/${classId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      setStudents(response.data);
+      const response = await api.get(`/enrollments/class/${classId}`);
+      setEnrolledStudents(response.data);
     } catch (error) {
-      console.error("Error fetching students:", error);
+      console.error('Error fetching enrolled students:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron cargar los alumnos inscritos",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudieron cargar los estudiantes. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -55,271 +76,283 @@ export default function StudentsSection() {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      toast({
-        description: "Ingrese un nombre o matrícula para buscar",
-      });
-      return;
-    }
+    if (!searchQuery.trim()) return;
 
     try {
       setIsSearching(true);
-      setSearchResults([]);
-      
-      const response = await axios.get(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/enrollments/search?query=${encodeURIComponent(searchQuery)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      
-      // Filter out students who are already enrolled
-      const filteredResults = response.data.filter(
-        (student: Student) => !students.some((s) => s.id === student.id)
-      );
-      
-      setSearchResults(filteredResults);
-      
-      if (filteredResults.length === 0) {
-        toast({
-          description: "No se encontraron alumnos con ese nombre o matrícula",
-        });
-      }
+      const response = await api.get(`/enrollments/search?query=${searchQuery}`);
+      setSearchResults(response.data);
     } catch (error) {
-      console.error("Error searching students:", error);
+      console.error('Error searching for students:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron buscar alumnos",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudieron buscar estudiantes. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
     }
   };
 
-  const enrollStudent = async (student: Student) => {
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/enrollments`,
-        {
-          classId,
-          studentId: student.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      
-      // Add the newly enrolled student to the list
-      setStudents([...students, {
-        id: student.id,
-        name: student.name,
-        email: student.email,
-        avatarUrl: student.avatarUrl,
-        enrollmentDate: new Date()
-      }]);
-      
-      // Remove from search results
-      setSearchResults(searchResults.filter((s) => s.id !== student.id));
-      
+  const handleEnrollStudent = async (student: Student) => {
+    setSelectedStudent(student);
+    
+    // Check if student is already enrolled
+    const isAlreadyEnrolled = enrolledStudents.some(s => s.id === student.id);
+    
+    if (isAlreadyEnrolled) {
       toast({
-        title: "Éxito",
-        description: `${student.name} ha sido inscrito en la clase`,
+        title: 'Estudiante ya inscrito',
+        description: `${student.name} ya está inscrito en esta clase.`,
+        variant: 'destructive',
       });
-    } catch (error: any) {
-      console.error("Error enrolling student:", error);
-      if (error.response?.data?.error?.code === "ALREADY_ENROLLED") {
-        toast({
-          title: "Alumno ya inscrito",
-          description: `${student.name} ya está inscrito en esta clase`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "No se pudo inscribir al alumno",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const removeStudent = async (studentId: string) => {
-    if (!confirm("¿Está seguro que desea eliminar este alumno de la clase?")) {
       return;
     }
     
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_URL}/api/enrollments/${classId}/${studentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      setIsEnrolling(true);
       
-      // Remove the student from the list
-      setStudents(students.filter((s) => s.id !== studentId));
+      await api.post('/enrollments', {
+        classId: classId,
+        studentId: student.id
+      });
+      
+      // Add the student to the enrolled list
+      setEnrolledStudents([...enrolledStudents, student]);
+      
+      // Clear search results and query
+      setSearchResults([]);
+      setSearchQuery('');
       
       toast({
-        title: "Éxito",
-        description: "Alumno eliminado de la clase correctamente",
+        title: 'Éxito',
+        description: `${student.name} ha sido inscrito en la clase.`,
       });
+      
+      // Close the dialog
+      setAddDialogOpen(false);
     } catch (error) {
-      console.error("Error removing student:", error);
+      console.error('Error enrolling student:', error);
       toast({
-        title: "Error",
-        description: "No se pudo eliminar al alumno de la clase",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo inscribir al estudiante. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
       });
+    } finally {
+      setIsEnrolling(false);
     }
   };
 
+  const openRemoveDialog = (student: Student) => {
+    setSelectedStudent(student);
+    setRemoveDialogOpen(true);
+  };
+
+  const handleRemoveStudent = async () => {
+    if (!selectedStudent) return;
+    
+    try {
+      setIsRemoving(true);
+      
+      await api.delete(`/enrollments/${classId}/${selectedStudent.id}`);
+      
+      // Remove the student from the enrolled list
+      setEnrolledStudents(enrolledStudents.filter(s => s.id !== selectedStudent.id));
+      
+      toast({
+        title: 'Estudiante removido',
+        description: `${selectedStudent.name} ha sido removido de la clase.`,
+      });
+      
+      // Close the dialog
+      setRemoveDialogOpen(false);
+      setSelectedStudent(null);
+    } catch (error) {
+      console.error('Error removing student:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo remover al estudiante. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Alumnos</h2>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={fetchStudents}
-            disabled={isLoading}
+      {isTeacher && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setAddDialogOpen(true)}
             className="flex items-center gap-1"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-            Actualizar
+            <UserPlus className="h-4 w-4" />
+            Agregar Estudiante
           </Button>
         </div>
-        
-        {/* Search Form */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="relative flex-1">
-            <Input
-              type="text"
-              placeholder="Buscar alumnos por nombre o matrícula..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pr-10"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
-          <Button onClick={handleSearch} disabled={isSearching}>
-            {isSearching ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                Buscando...
-              </>
-            ) : (
-              "Buscar"
-            )}
-          </Button>
-        </div>
-        
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="mb-8 border rounded-md overflow-hidden">
-            <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 font-medium">
-              Resultados de búsqueda ({searchResults.length})
-            </div>
-            <ul className="divide-y">
-              {searchResults.map((student) => (
-                <li key={student.id} className="flex items-center justify-between px-4 py-3">
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Estudiantes Inscritos ({enrolledStudents.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {enrolledStudents.length > 0 ? (
+            <div className="space-y-4">
+              {enrolledStudents.map((student) => (
+                <div
+                  key={student.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-100"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                      {student.avatarUrl ? (
-                        <img
-                          src={student.avatarUrl}
-                          alt={student.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">
-                          {student.name.charAt(0)}
-                        </span>
-                      )}
-                    </div>
+                    <Avatar>
+                      <AvatarImage src={student.avatarUrl} />
+                      <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
                     <div>
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-slate-500">{student.email}</p>
+                      <h4 className="font-medium">{student.name}</h4>
+                      <p className="text-sm text-gray-500">{student.email}</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => enrollStudent(student)}
-                    className="flex items-center gap-1"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Agregar
-                  </Button>
-                </li>
+                  {isTeacher && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openRemoveDialog(student)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <UserX className="h-4 w-4 mr-1" />
+                      Remover
+                    </Button>
+                  )}
+                </div>
               ))}
-            </ul>
-          </div>
-        )}
-        
-        {/* Enrolled Students List */}
-        <div className="border rounded-md overflow-hidden">
-          <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 font-medium">
-            Alumnos Inscritos ({students.length})
-          </div>
-          {isLoading ? (
-            <div className="p-6 text-center">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto text-slate-400 mb-2" />
-              <p>Cargando alumnos...</p>
-            </div>
-          ) : students.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">
-              <p>No hay alumnos inscritos en esta clase.</p>
-              <p className="text-sm mt-2">Use la búsqueda arriba para agregar alumnos.</p>
             </div>
           ) : (
-            <ul className="divide-y">
-              {students.map((student) => (
-                <li key={student.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                      {student.avatarUrl ? (
-                        <img
-                          src={student.avatarUrl}
-                          alt={student.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">
-                          {student.name.charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-slate-500">{student.email}</p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => removeStudent(student.id)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col items-center justify-center py-8">
+              <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay estudiantes inscritos</h3>
+              <p className="text-gray-500 text-center max-w-md">
+                {isTeacher
+                  ? 'No has agregado ningún estudiante a esta clase todavía. Usa el botón "Agregar Estudiante" para comenzar.'
+                  : 'No hay estudiantes inscritos en esta clase.'}
+              </p>
+            </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
+      {/* Dialog for adding students */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Estudiante</DialogTitle>
+            <DialogDescription>
+              Busca estudiantes por nombre, correo electrónico o matrícula para agregarlos a esta clase.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2 mt-4">
+            <Input
+              placeholder="Buscar estudiante..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? (
+                <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          <div className="mt-4 max-h-64 overflow-y-auto">
+            {searchResults.length > 0 ? (
+              <div className="space-y-3">
+                {searchResults.map((student) => (
+                  <div
+                    key={student.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={student.avatarUrl} />
+                        <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h4 className="font-medium">{student.name}</h4>
+                        <p className="text-sm text-gray-500">{student.email}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleEnrollStudent(student)}
+                      disabled={isEnrolling}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : searchQuery && !isSearching ? (
+              <div className="text-center py-6">
+                <p className="text-gray-500">No se encontraron estudiantes con "{searchQuery}"</p>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert dialog for removing students */}
+      <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedStudent && (
+                <span>
+                  Estás a punto de eliminar a <strong>{selectedStudent.name}</strong> de esta clase.
+                  Esta acción no se puede deshacer.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveStudent}
+              disabled={isRemoving}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isRemoving ? (
+                <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-}
+};
+
+export default StudentsSection;

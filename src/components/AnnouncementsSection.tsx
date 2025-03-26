@@ -9,12 +9,30 @@ import { FileText, Plus } from 'lucide-react';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import AnnouncementForm from '@/components/AnnouncementForm';
 
+// Define the announcement type
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  attachments: Array<{
+    id: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    fileUrl: string;
+  }>;
+  createdAt: string;
+}
+
 const AnnouncementsSection = () => {
   const { id: classId } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
-  const [announcements, setAnnouncements] = useState([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const isTeacher = currentUser?.role === 'teacher';
@@ -42,7 +60,7 @@ const AnnouncementsSection = () => {
     fetchAnnouncements();
   }, [classId, toast]);
 
-  const handleAnnouncementCreated = (newAnnouncement) => {
+  const handleAnnouncementCreated = (newAnnouncement: Announcement) => {
     setAnnouncements([newAnnouncement, ...announcements]);
     setShowForm(false);
     toast({
