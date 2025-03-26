@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +8,7 @@ import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import AnnouncementsSection from "@/components/AnnouncementsSection";
-import StudentsSection from "@/components/StudentsSection";
+import ClassStudents from "@/components/ClassStudents";
 
 interface ClassDetails {
   id: string;
@@ -149,7 +150,7 @@ export default function ClassDetail() {
         
         {isTeacher && (
           <TabsContent value="students">
-            <StudentsSection />
+            <ClassStudents />
           </TabsContent>
         )}
       </Tabs>
