@@ -91,14 +91,14 @@ const StudentDashboard = () => {
         className: assignment.className,
         classId: assignment.classId,
         dueDate: assignment.dueDate,
-        status: assignment.status,
+        status: assignment.status as 'pending' | 'submitted' | 'expired',
       }));
       
       setPendingAssignments(formattedAssignments);
     } catch (error) {
       console.error('Error fetching assignments:', error);
       // Use mock data if API fails
-      const mockAssignments = [
+      const mockAssignments: Assignment[] = [
         { id: 'a1', title: 'Tarea 1: Introducción', className: 'Programación Web', classId: 'c1', dueDate: new Date(Date.now() + 86400000 * 2).toISOString(), status: 'pending' },
         { id: 'a2', title: 'Actividad: Base de datos', className: 'Bases de Datos', classId: 'c2', dueDate: new Date(Date.now() + 86400000 * 1).toISOString(), status: 'pending' },
         { id: 'a3', title: 'Proyecto Final', className: 'Programación Web', classId: 'c1', dueDate: new Date(Date.now() - 86400000 * 2).toISOString(), status: 'expired' },

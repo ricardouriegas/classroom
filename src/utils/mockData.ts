@@ -1,3 +1,4 @@
+
 export interface NavItem {
   title: string;
   href: string;
@@ -92,6 +93,12 @@ export interface Assignment {
   description: string;
   dueDate: Date | string;
   classId: string;
+  className?: string;
+  status?: 'pending' | 'submitted' | 'expired';
+  submissionDate?: Date | string;
+  submissionFiles?: Attachment[];
+  grade?: number;
+  feedback?: string;
 }
 
 // New mock data exports:
@@ -130,13 +137,60 @@ export const mockAssignments: Assignment[] = [
     title: "Assignment 1",
     description: "Do math homework",
     dueDate: new Date(2023, 5, 1),
-    classId: "class1"
+    classId: "class1",
+    className: "Mathematics",
+    status: "pending"
   },
   {
     id: "assign2",
     title: "Assignment 2",
     description: "Complete physics experiment",
     dueDate: new Date(2023, 5, 5),
-    classId: "class2"
+    classId: "class2",
+    className: "Physics",
+    status: "submitted",
+    submissionDate: new Date(2023, 4, 30)
+  },
+  {
+    id: "assign3",
+    title: "Assignment 3",
+    description: "Complete calculus problems",
+    dueDate: new Date(2023, 4, 25),
+    classId: "class1",
+    className: "Mathematics",
+    status: "expired"
   }
 ];
+
+// Mock topic interface
+export interface Topic {
+  id: string;
+  name: string;
+  description?: string;
+  class_id: string;
+  order_index: number;
+  materials_count: number;
+  assignments_count: number;
+}
+
+// Mock material interface
+export interface Material {
+  id: string;
+  title: string;
+  description?: string;
+  topic_id: string;
+  created_at: string;
+  attachments: Attachment[];
+}
+
+// Mock student submission interface
+export interface StudentSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  student_name: string;
+  submission_date: string;
+  files: Attachment[];
+  grade?: number;
+  feedback?: string;
+}

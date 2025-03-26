@@ -1,85 +1,68 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, NavLink, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/Navbar';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Users, FileText, Layers, BookOpen } from 'lucide-react';
-import StudentsSection from '@/components/StudentsSection';
+import { Skeleton } from '@/components/ui/skeleton';
 import AnnouncementsSection from '@/components/AnnouncementsSection';
-import TopicsSection from '@/components/TopicsSection';
+import ClassContentStudent from '@/components/ClassContentStudent';
 
 interface ClassDetails {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   class_code: string;
   career_id: string;
   career_name: string;
   semester: string;
   teacher_id: string;
   teacher_name: string;
+  students_count?: number;
 }
 
 const ClassDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: classId } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [classDetails, setClassDetails] = useState<ClassDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('announcements');
-
+  
   useEffect(() => {
     const fetchClassDetails = async () => {
+      if (!classId) return;
+      
       try {
         setIsLoading(true);
-        const response = await api.get(`/classes/${id}`);
+        const response = await api.get(`/classes/${classId}`);
         setClassDetails(response.data);
       } catch (error) {
         console.error('Error fetching class details:', error);
         toast({
           title: 'Error',
-          description: 'Could not load class details. Please try again.',
+          description: 'No se pudo cargar la información de la clase. Por favor, inténtelo de nuevo.',
           variant: 'destructive',
         });
-        // Navigate back to dashboard if class not found
-        navigate('/dashboard');
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) {
-      fetchClassDetails();
-    }
-  }, [id, navigate, toast]);
+    fetchClassDetails();
+  }, [classId, toast]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="container mx-auto py-8 px-4">
+          <Skeleton className="h-10 w-64 mb-2" />
+          <Skeleton className="h-6 w-48 mb-8" />
+          <div className="space-y-6">
+            <Skeleton className="h-64 rounded-lg" />
           </div>
-        </main>
+        </div>
       </div>
     );
   }
@@ -88,103 +71,61 @@ const ClassDetail = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-10">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Class Not Found</h2>
-              <p className="text-gray-600 mb-6">The class you're looking for doesn't exist or you don't have access to it.</p>
-              <Button asChild>
-                <Link to="/dashboard">Return to Dashboard</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
+        <div className="container mx-auto py-8 px-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Clase no encontrada</h1>
+          <p className="text-gray-600 mb-8">La clase que estás buscando no existe o no tienes acceso a ella.</p>
+        </div>
       </div>
     );
   }
 
+  const isTeacher = currentUser?.role === 'teacher';
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        {/* Breadcrumbs */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/dashboard">
-                  <ChevronLeft className="h-4 w-4 mr-1 inline" />
-                  Dashboard
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{classDetails.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* Class Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{classDetails.name}</h1>
-          <div className="mt-2 flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-gray-600">
-            <div className="flex items-center">
-              <BookOpen className="h-4 w-4 mr-1" />
-              <span>{classDetails.career_name}</span>
-            </div>
-            <div className="flex items-center">
-              <Users className="h-4 w-4 mr-1" />
-              <span>Teacher: {classDetails.teacher_name}</span>
-            </div>
-            <div className="flex items-center">
-              <FileText className="h-4 w-4 mr-1" />
-              <span>Code: {classDetails.class_code}</span>
-            </div>
-            <div className="flex items-center">
-              <Layers className="h-4 w-4 mr-1" />
-              <span>Semester: {classDetails.semester}</span>
-            </div>
+      <div className="container mx-auto py-8 px-4">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{classDetails.name}</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center text-gray-600 gap-2 sm:gap-6">
+            <p>{classDetails.career_name}</p>
+            <p className="flex items-center">
+              <span className="hidden sm:inline mx-2">•</span>
+              {classDetails.semester}
+            </p>
+            <p className="flex items-center">
+              <span className="hidden sm:inline mx-2">•</span>
+              Profesor: {classDetails.teacher_name}
+            </p>
           </div>
-          {classDetails.description && (
-            <p className="mt-4 text-gray-600 max-w-3xl">{classDetails.description}</p>
-          )}
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        </header>
+        
+        <Tabs defaultValue="announcements" className="mt-6">
           <TabsList className="mb-6">
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
-            <TabsTrigger value="content">Content</TabsTrigger>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
-            <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="announcements">Anuncios</TabsTrigger>
+            <TabsTrigger value="content">Contenido</TabsTrigger>
+            {isTeacher && <TabsTrigger value="students">Alumnos</TabsTrigger>}
           </TabsList>
-
-          <TabsContent value="announcements" className="space-y-4">
+          
+          <TabsContent value="announcements">
             <AnnouncementsSection />
           </TabsContent>
-
-          <TabsContent value="content" className="space-y-4">
-            {id && <TopicsSection classId={id} />}
+          
+          <TabsContent value="content">
+            {isTeacher ? (
+              <div>Contenido de Profesor</div>
+            ) : (
+              <ClassContentStudent classId={classId!} />
+            )}
           </TabsContent>
-
-          <TabsContent value="assignments" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Assignments</CardTitle>
-                <CardDescription>Course assignments and homework</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Assignments section is under development.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="students" className="space-y-4">
-            {id && <StudentsSection classId={id} isTeacher={currentUser?.role === 'teacher'} />}
-          </TabsContent>
+          
+          {isTeacher && (
+            <TabsContent value="students">
+              <div>Lista de Alumnos</div>
+            </TabsContent>
+          )}
         </Tabs>
-      </main>
+      </div>
     </div>
   );
 };

@@ -1,47 +1,114 @@
 
-import { useState, useRef } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
-import { X, Upload, FileText } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useRef } from 'react';
+import { useAuth, api } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { FileUp, X, File, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
-interface AnnouncementFormProps {
-  onAnnouncementCreated: () => void;
+// Define announcement interface
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  attachments: Array<{
+    id: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    fileUrl: string;
+  }>;
+  createdAt: string;
 }
 
-export default function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProps) {
-  const { id: classId } = useParams<{ id: string }>();
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+interface AnnouncementFormProps {
+  classId?: string;
+  onAnnouncementCreated: (announcement: Announcement) => void;
+  onCancel: () => void;
+}
 
+const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ 
+  classId, 
+  onAnnouncementCreated, 
+  onCancel 
+}) => {
+  const { currentUser } = useAuth();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      
-      // Check if adding these files would exceed the limit
-      if (files.length + newFiles.length > 5) {
-        toast({
-          title: "File Limit Exceeded",
-          description: "You can upload a maximum of 5 files per announcement",
-          variant: "destructive",
-        });
-        return;
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndAddFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      validateAndAddFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const validateAndAddFiles = (files: File[]) => {
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+    
+    files.forEach(file => {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        invalidFiles.push(`${file.name} (tipo no permitido)`);
+      } else if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push(`${file.name} (excede 5MB)`);
+      } else {
+        validFiles.push(file);
       }
-      
-      setFiles([...files, ...newFiles]);
+    });
+    
+    if (invalidFiles.length > 0) {
+      toast({
+        title: 'Archivos no válidos',
+        description: invalidFiles.join(', '),
+        variant: 'destructive',
+      });
+    }
+    
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
     }
   };
 
   const removeFile = (index: number) => {
-    setFiles(files.filter((_, i) => i !== index));
+    setSelectedFiles(files => files.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,172 +116,205 @@ export default function AnnouncementForm({ onAnnouncementCreated }: Announcement
     
     if (!title.trim()) {
       toast({
-        title: "Missing Title",
-        description: "Please provide a title for your announcement",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Por favor, ingresa un título para el anuncio.',
+        variant: 'destructive',
       });
       return;
     }
     
     if (!content.trim()) {
       toast({
-        title: "Missing Content",
-        description: "Please provide content for your announcement",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Por favor, ingresa el contenido del anuncio.',
+        variant: 'destructive',
       });
       return;
     }
-
+    
     try {
       setIsSubmitting(true);
+      setUploadProgress(10);
       
       const formData = new FormData();
-      formData.append("class_id", classId || "");
-      formData.append("title", title);
-      formData.append("content", content);
+      formData.append('title', title);
+      formData.append('content', content);
+      if (classId) {
+        formData.append('classId', classId);
+      }
       
-      // Append files if any
-      files.forEach((file) => {
-        formData.append("attachments", file);
+      selectedFiles.forEach(file => {
+        formData.append('attachments', file);
       });
       
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/announcements`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const intervalId = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          return newProgress < 90 ? newProgress : prev;
+        });
+      }, 300);
       
-      // Reset form
-      setTitle("");
-      setContent("");
-      setFiles([]);
+      const response = await api.post('/announcements', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       
-      // Notify parent component to refresh announcements
-      onAnnouncementCreated();
+      clearInterval(intervalId);
+      setUploadProgress(100);
       
+      // Pass the created announcement back to the parent component
+      onAnnouncementCreated(response.data);
     } catch (error) {
-      console.error("Error creating announcement:", error);
+      console.error('Error creating announcement:', error);
       toast({
-        title: "Error",
-        description: "Could not create announcement. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo crear el anuncio. Por favor, inténtalo de nuevo.',
+        variant: 'destructive',
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
 
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium mb-1">
-              Title
-            </label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Announcement title"
-              disabled={isSubmitting}
-            />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="title" className="text-sm font-medium text-gray-700">
+          Título
+        </Label>
+        <Input
+          id="title"
+          placeholder="Título del anuncio"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={isSubmitting}
+          className="w-full"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="content" className="block text-sm font-medium text-gray-700">
+          Contenido
+        </Label>
+        <Textarea
+          id="content"
+          placeholder="Escribe aquí el contenido del anuncio..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="min-h-[120px]"
+          disabled={isSubmitting}
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label className="block text-sm font-medium text-gray-700">
+          Archivos adjuntos (opcional)
+        </Label>
+        
+        {/* File drop zone */}
+        <div
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          onClick={triggerFileInput}
+          className={`border-2 border-dashed rounded-lg p-6 cursor-pointer flex flex-col items-center justify-center transition-colors ${
+            dragActive ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary/50'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileChange}
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.gif"
+            className="hidden"
+            disabled={isSubmitting}
+          />
           
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium mb-1">
-              Content
-            </label>
-            <Textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your announcement here..."
-              rows={5}
-              disabled={isSubmitting}
-            />
-          </div>
-          
-          {/* File Attachments */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Attachments (Optional)
-            </label>
-            
-            <div className="mt-1 mb-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSubmitting || files.length >= 5}
-              >
-                <Upload className="h-4 w-4" />
-                {files.length === 0 ? "Add files" : "Add more files"}
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                multiple
-                disabled={isSubmitting || files.length >= 5}
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Up to 5 files, max 10MB each
-              </p>
-            </div>
-            
-            {/* File List */}
-            {files.length > 0 && (
-              <div className="border rounded-md overflow-hidden mt-2">
-                <div className="bg-slate-100 px-3 py-2 text-sm font-medium">
-                  Attachments ({files.length}/5)
-                </div>
-                <ul className="divide-y">
-                  {files.map((file, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-slate-400" />
-                        <span className="text-sm truncate max-w-[200px]">
-                          {file.name}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          ({(file.size / 1024).toFixed(1)} KB)
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => removeFile(index)}
-                        disabled={isSubmitting}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Post Announcement"}
-            </Button>
+          <FileUp className="h-10 w-10 text-gray-400 mb-2" />
+          <p className="text-sm text-gray-600 text-center">
+            <span className="font-medium">
+              Haz clic o arrastra archivos aquí
+            </span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            PDF, JPG, PNG, GIF (máx. 5MB)
+          </p>
+        </div>
+      </div>
+      
+      {/* Selected files */}
+      {selectedFiles.length > 0 && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Archivos seleccionados ({selectedFiles.length})
+          </label>
+          <div className="space-y-2">
+            {selectedFiles.map((file, index) => (
+              <Card key={index} className="border border-gray-200">
+                <CardContent className="p-3 flex justify-between items-center">
+                  <div className="flex items-center">
+                    <File className="h-5 w-5 mr-2 text-blue-500" />
+                    <div>
+                      <p className="text-sm font-medium">{file.name}</p>
+                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    disabled={isSubmitting}
+                    className="text-gray-500 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </form>
-    </Card>
+      )}
+      
+      {/* Upload progress */}
+      {isSubmitting && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Publicando anuncio...
+          </label>
+          <Progress value={uploadProgress} className="h-2" />
+          <p className="text-xs text-gray-500 text-right">{uploadProgress}%</p>
+        </div>
+      )}
+      
+      {/* Form actions */}
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Publicando...' : 'Publicar Anuncio'}
+        </Button>
+      </div>
+    </form>
   );
-}
+};
+
+export default AnnouncementForm;

@@ -27,6 +27,10 @@ interface Announcement {
   createdAt: string;
 }
 
+interface AnnouncementCreatedProps {
+  (newAnnouncement: Announcement): void;
+}
+
 const AnnouncementsSection = () => {
   const { id: classId } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
@@ -60,7 +64,7 @@ const AnnouncementsSection = () => {
     fetchAnnouncements();
   }, [classId, toast]);
 
-  const handleAnnouncementCreated = (newAnnouncement: Announcement) => {
+  const handleAnnouncementCreated: AnnouncementCreatedProps = (newAnnouncement) => {
     setAnnouncements([newAnnouncement, ...announcements]);
     setShowForm(false);
     toast({

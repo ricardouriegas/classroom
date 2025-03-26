@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { BookOpen, Users } from 'lucide-react';
 
-interface Class {
+interface ClassData {
   id: string;
   name: string;
   description?: string;
@@ -14,67 +14,70 @@ interface Class {
   semester: string;
   teacher_id: string;
   teacher_name?: string;
+  students_count?: number;
+  color?: string;
 }
 
 interface ClassCardProps {
-  classData: Class;
+  classData: ClassData;
 }
 
 const ClassCard: React.FC<ClassCardProps> = ({ classData }) => {
-  // Generate a color based on class name (for consistent visual identity)
-  const getClassColor = (className: string): string => {
+  // If no color is provided, generate one based on the class name
+  const getClassColor = () => {
+    if (classData.color) return classData.color;
+    
     const colors = [
-      '#4285F4', // Blue
-      '#34A853', // Green
-      '#FBBC05', // Yellow
-      '#EA4335', // Red
-      '#8E24AA', // Purple
-      '#16A2B8', // Teal
-      '#FF7043', // Deep Orange
-      '#6B7280', // Gray
+      '#4285F4', // Google Blue
+      '#34A853', // Google Green
+      '#FBBC05', // Google Yellow
+      '#EA4335', // Google Red
+      '#8AB4F8', // Light Blue
+      '#F6AE2D', // Yellow
+      '#F26419', // Orange
+      '#1B998B', // Teal
+      '#2D3047', // Dark Blue
+      '#7678ED', // Purple
     ];
     
-    // Simple hash function to get consistent color for same class name
-    let hash = 0;
-    for (let i = 0; i < className.length; i++) {
-      hash = className.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    // Simple hash function to get consistent color based on class name
+    const hash = classData.name.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + acc;
+    }, 0);
     
-    return colors[Math.abs(hash) % colors.length];
+    return colors[hash % colors.length];
   };
 
-  const bgColor = getClassColor(classData.name);
+  const cardColor = getClassColor();
 
   return (
-    <Link to={`/class/${classData.id}`} className="block hover:no-underline">
-      <Card className="h-full hover:shadow-md transition-shadow overflow-hidden border border-gray-200">
+    <Link to={`/class/${classData.id}`} className="block h-full transition-transform hover:scale-105">
+      <Card className="h-full border overflow-hidden hover:shadow-md transition-shadow">
         <div 
-          className="p-4 h-24 flex flex-col justify-between"
-          style={{ backgroundColor: bgColor, color: '#ffffff' }}
+          className="h-24 flex items-center justify-center p-4 text-white font-bold text-xl text-center"
+          style={{ backgroundColor: cardColor }}
         >
-          <div className="flex justify-between items-start">
-            <h3 className="font-semibold text-lg line-clamp-1">{classData.name}</h3>
-            <BookOpen className="h-5 w-5 opacity-80" />
-          </div>
-          
-          <p className="opacity-90 text-sm">{classData.semester}</p>
+          {classData.name}
         </div>
-        
-        <CardContent className="p-4 space-y-3">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">Carrera:</span> {classData.career_name}
-          </p>
-          
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">Código:</span> {classData.class_code}
-          </p>
-          
-          {classData.teacher_name && (
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Maestro:</span> {classData.teacher_name}
-            </p>
+        <CardContent className="pt-4">
+          <div className="text-sm text-gray-500 mb-2">{classData.career_name} • {classData.semester}</div>
+          {classData.description && (
+            <p className="text-sm text-gray-700 line-clamp-2">{classData.description}</p>
           )}
         </CardContent>
+        <CardFooter className="border-t p-4 text-xs text-gray-500 flex justify-between">
+          <div className="flex items-center">
+            <BookOpen className="h-3 w-3 mr-1" />
+            <span>{classData.class_code}</span>
+          </div>
+          
+          {classData.students_count !== undefined && (
+            <div className="flex items-center">
+              <Users className="h-3 w-3 mr-1" />
+              <span>{classData.students_count} alumnos</span>
+            </div>
+          )}
+        </CardFooter>
       </Card>
     </Link>
   );

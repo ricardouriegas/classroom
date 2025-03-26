@@ -46,10 +46,10 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
 
     // Get materials with topic info
     const [materials] = await pool.query(`
-      SELECT m.*, t.name as topic_name
+      SELECT m.*, t.name as topic_name 
       FROM materials m
       JOIN topics t ON m.topic_id = t.id
-      WHERE m.class_id = ?
+      WHERE t.class_id = ?
       ORDER BY m.created_at DESC
     `, [classId]);
 
@@ -74,11 +74,10 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
       // Format material
       formattedMaterials.push({
         id: material.id,
-        classId: material.class_id,
-        topicId: material.topic_id,
-        topicName: material.topic_name,
         title: material.title,
         description: material.description,
+        topicId: material.topic_id,
+        topicName: material.topic_name,
         createdAt: material.created_at,
         attachments: formattedAttachments
       });
@@ -101,9 +100,9 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
  * @desc    Create a new material
  * @access  Private (Teachers only)
  */
-router.post('/', authMiddleware, upload.array('attachments', 10), async (req, res) => {
+router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res) => {
   try {
-    const { class_id, topic_id, title, description } = req.body;
+    const { title, description, topic_id } = req.body;
     const userId = req.user.id;
     const files = req.files || [];
 
@@ -118,68 +117,67 @@ router.post('/', authMiddleware, upload.array('attachments', 10), async (req, re
     }
 
     // Validate input
-    if (!class_id || !topic_id || !title) {
+    if (!title || !topic_id) {
       return res.status(400).json({
         error: {
-          message: 'Missing required fields',
+          message: 'Title and topic ID are required',
           code: 'MISSING_FIELDS'
         }
       });
     }
 
-    // Check if the teacher owns this class
-    const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
-      [class_id, userId]
-    );
-    
-    if (teacherCheck.length === 0) {
-      return res.status(403).json({
-        error: {
-          message: 'You do not have permission to create materials for this class',
-          code: 'ACCESS_DENIED'
-        }
-      });
-    }
-
-    // Check if the topic exists and belongs to the class
-    const [topicCheck] = await pool.query(
-      'SELECT id FROM topics WHERE id = ? AND class_id = ?',
-      [topic_id, class_id]
-    );
+    // Check if topic exists and if the teacher has access to the class
+    const [topicCheck] = await pool.query(`
+      SELECT t.id, t.class_id, c.teacher_id 
+      FROM topics t
+      JOIN classes c ON t.class_id = c.id
+      WHERE t.id = ?
+    `, [topic_id]);
     
     if (topicCheck.length === 0) {
       return res.status(404).json({
         error: {
-          message: 'Topic not found or does not belong to this class',
+          message: 'Topic not found',
           code: 'TOPIC_NOT_FOUND'
         }
       });
     }
 
-    // Generate a unique material ID
-    const materialId = crypto.randomUUID();
+    const topic = topicCheck[0];
     
+    // Check if the teacher owns the class
+    if (topic.teacher_id !== userId) {
+      return res.status(403).json({
+        error: {
+          message: 'You do not have permission to add materials to this class',
+          code: 'ACCESS_DENIED'
+        }
+      });
+    }
+
     // Begin transaction
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
     try {
+      // Generate a unique material ID
+      const materialId = crypto.randomUUID();
+      
       // Insert material into database
       await connection.query(
-        'INSERT INTO materials (id, class_id, topic_id, title, description) VALUES (?, ?, ?, ?, ?)',
-        [materialId, class_id, topic_id, title, description || null]
+        'INSERT INTO materials (id, topic_id, title, description, created_by) VALUES (?, ?, ?, ?, ?)',
+        [materialId, topic_id, title, description || null, userId]
       );
 
-      // Process file attachments
+      // Process material attachments
       const attachments = [];
       for (const file of files) {
         const attachmentId = crypto.randomUUID();
         const fileUrl = getFileUrl(file.filename);
         
         await connection.query(
-          'INSERT INTO material_attachments (id, material_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
-          [attachmentId, materialId, file.originalname, file.size, file.mimetype, fileUrl]
+          'INSERT INTO material_attachments (id, material_id, file_name, file_path, file_size, file_type) VALUES (?, ?, ?, ?, ?, ?)',
+          [attachmentId, materialId, file.originalname, fileUrl, file.size, file.mimetype]
         );
         
         attachments.push({
@@ -202,13 +200,12 @@ router.post('/', authMiddleware, upload.array('attachments', 10), async (req, re
       // Format response
       const material = {
         id: materialId,
-        classId: class_id,
-        topicId: topic_id,
-        topicName: topicInfo[0].name,
         title,
         description: description || null,
-        attachments,
-        createdAt: new Date()
+        topicId: topic_id,
+        topicName: topicInfo[0].name,
+        createdAt: new Date(),
+        attachments
       };
 
       res.status(201).json(material);
