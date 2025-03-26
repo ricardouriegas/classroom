@@ -1,55 +1,65 @@
 
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, Bell, Book } from "lucide-react";
-import axios from "axios";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
-import AnnouncementsSection from "@/components/AnnouncementsSection";
-import ClassStudents from "@/components/ClassStudents";
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, NavLink, useNavigate } from 'react-router-dom';
+import { useAuth, api } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import Navbar from '@/components/Navbar';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChevronLeft, Users, FileText, Layers, BookOpen } from 'lucide-react';
+import StudentsSection from '@/components/StudentsSection';
+import AnnouncementsSection from '@/components/AnnouncementsSection';
 
 interface ClassDetails {
   id: string;
   name: string;
-  description?: string;
-  teacherId: string;
-  teacherName: string;
-  classCode: string;
+  description: string;
+  class_code: string;
+  career_id: string;
+  career_name: string;
   semester: string;
-  careerName: string;
-  createdAt: string;
+  teacher_id: string;
+  teacher_name: string;
 }
 
-export default function ClassDetail() {
+const ClassDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { currentUser } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [classDetails, setClassDetails] = useState<ClassDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('announcements');
 
   useEffect(() => {
     const fetchClassDetails = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/classes/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
+        const response = await api.get(`/classes/${id}`);
         setClassDetails(response.data);
       } catch (error) {
-        console.error("Error fetching class details:", error);
+        console.error('Error fetching class details:', error);
         toast({
-          title: "Error",
-          description: "Could not load class details",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Could not load class details. Please try again.',
+          variant: 'destructive',
         });
+        // Navigate back to dashboard if class not found
+        navigate('/dashboard');
       } finally {
         setIsLoading(false);
       }
@@ -58,102 +68,132 @@ export default function ClassDetail() {
     if (id) {
       fetchClassDetails();
     }
-  }, [id, toast]);
-
-  const goBack = () => {
-    navigate("/dashboard");
-  };
-
-  const isTeacher = user?.role === "teacher";
+  }, [id, navigate, toast]);
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 w-1/4 bg-slate-200 rounded mb-4"></div>
-          <div className="h-6 w-3/4 bg-slate-200 rounded mb-6"></div>
-          <div className="h-12 w-full bg-slate-200 rounded mb-6"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </main>
       </div>
     );
   }
 
   if (!classDetails) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold">Class not found</h2>
-          <p className="text-slate-500 mt-2">
-            The class you're looking for doesn't exist or you don't have access.
-          </p>
-          <Button className="mt-6" onClick={goBack}>
-            Return to Dashboard
-          </Button>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-10">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Class Not Found</h2>
+              <p className="text-gray-600 mb-6">The class you're looking for doesn't exist or you don't have access to it.</p>
+              <Button asChild>
+                <Link to="/dashboard">Return to Dashboard</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          className="mb-4 pl-0 hover:bg-transparent"
-          onClick={goBack}
-        >
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Back to Dashboard
-        </Button>
-        <h1 className="text-3xl font-bold">{classDetails.name}</h1>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2 text-slate-500">
-          <p>Teacher: {classDetails.teacherName}</p>
-          <p>Career: {classDetails.careerName}</p>
-          <p>Semester: {classDetails.semester}</p>
-          <p>Code: {classDetails.classCode}</p>
-        </div>
-        {classDetails.description && (
-          <p className="mt-4 text-slate-700 dark:text-slate-300">
-            {classDetails.description}
-          </p>
-        )}
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/dashboard">
+                  <ChevronLeft className="h-4 w-4 mr-1 inline" />
+                  Dashboard
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{classDetails.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-      <Tabs defaultValue="announcements" className="mt-6">
-        <TabsList className="mb-6">
-          <TabsTrigger value="announcements" className="flex items-center gap-1">
-            <Bell className="h-4 w-4" />
-            Anuncios
-          </TabsTrigger>
-          <TabsTrigger value="topics" className="flex items-center gap-1">
-            <Book className="h-4 w-4" />
-            Temas
-          </TabsTrigger>
-          {isTeacher && (
-            <TabsTrigger value="students" className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              Alumnos
-            </TabsTrigger>
-          )}
-        </TabsList>
-        
-        <TabsContent value="announcements">
-          <AnnouncementsSection />
-        </TabsContent>
-        
-        <TabsContent value="topics">
-          <div className="text-center p-8 text-slate-500">
-            <h3 className="text-xl font-medium mb-2">Temas Próximamente</h3>
-            <p>Esta función está en desarrollo.</p>
+        {/* Class Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">{classDetails.name}</h1>
+          <div className="mt-2 flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-gray-600">
+            <div className="flex items-center">
+              <BookOpen className="h-4 w-4 mr-1" />
+              <span>{classDetails.career_name}</span>
+            </div>
+            <div className="flex items-center">
+              <Users className="h-4 w-4 mr-1" />
+              <span>Teacher: {classDetails.teacher_name}</span>
+            </div>
+            <div className="flex items-center">
+              <FileText className="h-4 w-4 mr-1" />
+              <span>Code: {classDetails.class_code}</span>
+            </div>
+            <div className="flex items-center">
+              <Layers className="h-4 w-4 mr-1" />
+              <span>Semester: {classDetails.semester}</span>
+            </div>
           </div>
-        </TabsContent>
-        
-        {isTeacher && (
-          <TabsContent value="students">
-            <ClassStudents />
+          {classDetails.description && (
+            <p className="mt-4 text-gray-600 max-w-3xl">{classDetails.description}</p>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="students">Students</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="announcements" className="space-y-4">
+            <AnnouncementsSection />
           </TabsContent>
-        )}
-      </Tabs>
+
+          <TabsContent value="content" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Course Content</CardTitle>
+                <CardDescription>Course materials and resources</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Content section is under development.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="assignments" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Assignments</CardTitle>
+                <CardDescription>Course assignments and homework</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Assignments section is under development.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="students" className="space-y-4">
+            <StudentsSection classId={id!} isTeacher={currentUser?.role === 'teacher'} />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
-}
+};
+
+export default ClassDetail;

@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -92,11 +93,6 @@ export default function AnnouncementForm({ onAnnouncementCreated }: Announcement
       setTitle("");
       setContent("");
       setFiles([]);
-      
-      toast({
-        title: "Announcement Created",
-        description: "Your announcement has been posted to the class",
-      });
       
       // Notify parent component to refresh announcements
       onAnnouncementCreated();
