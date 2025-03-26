@@ -9,6 +9,7 @@ const classesRoutes = require('./routes/classes.routes');
 const topicsRoutes = require('./routes/topics.routes');
 const careersRoutes = require('./routes/careers.routes');
 const announcementsRoutes = require('./routes/announcements.routes');
+const enrollmentsRoutes = require('./routes/enrollments.routes');
 
 // Initialize express app
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api/classes', classesRoutes);
 app.use('/api/topics', topicsRoutes);
 app.use('/api/careers', careersRoutes);
 app.use('/api/announcements', announcementsRoutes);
+app.use('/api/enrollments', enrollmentsRoutes);
 
 // Root route
 app.get('/', (req, res) => {

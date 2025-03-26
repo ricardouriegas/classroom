@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
@@ -60,6 +59,8 @@ router.post('/', authMiddleware, async (req, res) => {
     const { name, description, career_id, semester } = req.body;
     const teacherId = req.user.id;
     
+    console.log('Attempting to create class with teacher ID:', teacherId);
+    
     // Check if user is a teacher
     if (req.user.role !== 'teacher') {
       return res.status(403).json({
@@ -76,6 +77,22 @@ router.post('/', authMiddleware, async (req, res) => {
         error: {
           message: 'Missing required fields',
           code: 'MISSING_FIELDS'
+        }
+      });
+    }
+    
+    // Verify the teacher exists in the database
+    const [teacherExists] = await pool.query(
+      'SELECT id FROM users WHERE id = ? AND role = "teacher"',
+      [teacherId]
+    );
+    
+    if (teacherExists.length === 0) {
+      console.error(`Teacher with ID ${teacherId} not found in the database`);
+      return res.status(404).json({
+        error: {
+          message: 'Teacher not found. Your user ID may not exist in the database.',
+          code: 'TEACHER_NOT_FOUND'
         }
       });
     }

@@ -1,14 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockClasses, mockAnnouncements } from '@/utils/mockData';
+import { mockAnnouncements } from '@/utils/mockData';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import { 
   BookOpen, 
@@ -17,19 +16,31 @@ import {
   Plus, 
   FileText,
   ClipboardCheck,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
+
+// Define interface for class data
+interface ClassData {
+  id: string;
+  name: string;
+  description?: string;
+  class_code: string;
+  career_id: string;
+  career_name: string;
+  semester: string;
+  teacher_id: string;
+  teacher_name: string;
+  created_at: string;
+}
 
 const StudentDashboard = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [joinCode, setJoinCode] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  
-  if (!currentUser || currentUser.role !== 'student') return null;
-  
-  // Filter classes where this student is enrolled
-  const studentClasses = mockClasses.filter(c => c.students.includes(currentUser.id));
+  const [isLoading, setIsLoading] = useState(true);
+  const [studentClasses, setStudentClasses] = useState<ClassData[]>([]);
   
   // Get pending assignments for the student (mock data - in real app would come from API)
   const pendingAssignments = [
@@ -39,11 +50,54 @@ const StudentDashboard = () => {
   ];
   
   // Get recent announcements for student's classes
-  const classIds = studentClasses.map(c => c.id);
-  const recentAnnouncements = mockAnnouncements
-    .filter(a => classIds.includes(a.classId))
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 5);
+  const [recentAnnouncements, setRecentAnnouncements] = useState([]);
+  
+  // Fetch classes from API when component mounts
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get('/classes');
+        console.log('Fetched classes for student:', response.data);
+        setStudentClasses(response.data);
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar tus clases. Por favor, inténtelo de nuevo.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClasses();
+  }, [toast]);
+  
+  if (!currentUser || currentUser.role !== 'student') return null;
+  
+  // Function to generate color based on class name
+  const getClassColor = (className: string): string => {
+    const colors = [
+      '#4285F4', // Blue
+      '#34A853', // Green
+      '#FBBC05', // Yellow
+      '#EA4335', // Red
+      '#8E24AA', // Purple
+      '#16A2B8', // Teal
+      '#FF7043', // Deep Orange
+      '#6B7280', // Gray
+    ];
+    
+    // Simple hash function to get consistent color for same class name
+    let hash = 0;
+    for (let i = 0; i < className.length; i++) {
+      hash = className.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
   
   // Handle joining a class
   const handleJoinClass = () => {
@@ -114,34 +168,42 @@ const StudentDashboard = () => {
             </div>
             
             <TabsContent value="classes" className="mt-2">
-              {studentClasses.length > 0 ? (
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse">
+                      <div className="bg-slate-200 h-24"></div>
+                      <CardContent className="p-4">
+                        <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : studentClasses.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {studentClasses.map(classItem => (
                     <Link to={`/class/${classItem.id}`} key={classItem.id} className="block hover:no-underline">
                       <Card className="h-full hover:shadow-md transition-shadow overflow-hidden border border-gray-200">
                         <div 
                           className="p-4 h-24 flex flex-col justify-between"
-                          style={{ backgroundColor: classItem.color || '#4285F4', color: '#ffffff' }}
+                          style={{ backgroundColor: getClassColor(classItem.name), color: '#ffffff' }}
                         >
                           <div className="flex justify-between items-start">
                             <h3 className="font-semibold text-lg line-clamp-1">{classItem.name}</h3>
                             <BookOpen className="h-5 w-5 opacity-80" />
                           </div>
                           
-                          {classItem.section && (
-                            <p className="opacity-90 text-sm">{classItem.section}</p>
-                          )}
+                          <p className="opacity-90 text-sm">{classItem.semester}</p>
                         </div>
                         
                         <CardContent className="p-4 space-y-3">
-                          {classItem.subject && (
-                            <p className="text-sm text-gray-600">
-                              <span className="font-medium">Materia:</span> {classItem.subject}
-                            </p>
-                          )}
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Carrera:</span> {classItem.career_name}
+                          </p>
                           
                           <p className="text-sm text-gray-600">
-                            <span className="font-medium">Profesor:</span> {classItem.teacherName}
+                            <span className="font-medium">Profesor:</span> {classItem.teacher_name}
                           </p>
                         </CardContent>
                       </Card>
@@ -226,23 +288,16 @@ const StudentDashboard = () => {
             </TabsContent>
             
             <TabsContent value="announcements" className="mt-2">
-              {recentAnnouncements.length > 0 ? (
-                <div className="space-y-4">
-                  {recentAnnouncements.map(announcement => (
-                    <AnnouncementCard key={announcement.id} announcement={announcement} />
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="pt-8 pb-8 flex flex-col items-center justify-center text-center">
-                    <FileText className="h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-xl font-medium text-gray-700 mb-2">No hay anuncios</h3>
-                    <p className="text-gray-500">
-                      No hay anuncios recientes para tus clases.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              {/* This will be updated with real announcements in the future */}
+              <Card>
+                <CardContent className="pt-8 pb-8 flex flex-col items-center justify-center text-center">
+                  <FileText className="h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-xl font-medium text-gray-700 mb-2">No hay anuncios</h3>
+                  <p className="text-gray-500">
+                    No hay anuncios recientes para tus clases.
+                  </p>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

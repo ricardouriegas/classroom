@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,34 +11,95 @@ import {
   Clock, 
   Plus, 
   FileText,
-  ClipboardCheck
+  ClipboardCheck,
+  RefreshCw
 } from 'lucide-react';
-import { mockClasses, mockAnnouncements } from '@/utils/mockData';
 import AnnouncementCard from '@/components/AnnouncementCard';
+import { mockAnnouncements } from '@/utils/mockData';
+
+// Define interface for class data
+interface ClassData {
+  id: string;
+  name: string;
+  description?: string;
+  class_code: string;
+  career_id: string;
+  career_name: string;
+  semester: string;
+  teacher_id: string;
+  students_count?: number;
+  created_at: string;
+}
+
+interface PendingSubmission {
+  id: string;
+  studentName: string;
+  assignmentTitle: string;
+  className: string;
+  dueDate: Date;
+}
 
 const TeacherDashboard = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('classes');
-  
-  if (!currentUser || currentUser.role !== 'teacher') return null;
-  
-  // Filter classes where this teacher is the instructor
-  const teacherClasses = mockClasses.filter(c => c.teacherId === currentUser.id);
+  const [isLoading, setIsLoading] = useState(true);
+  const [teacherClasses, setTeacherClasses] = useState<ClassData[]>([]);
+  const [recentAnnouncements, setRecentAnnouncements] = useState(mockAnnouncements.slice(0, 5));
   
   // Get pending submissions to grade (mock data - in real app would come from API)
   const pendingSubmissions = [
     { id: 's1', studentName: 'María García', assignmentTitle: 'Tarea 1: Introducción', className: 'Programación Web', dueDate: new Date(2023, 5, 15) },
     { id: 's2', studentName: 'Carlos López', assignmentTitle: 'Actividad: Base de datos', className: 'Bases de Datos', dueDate: new Date(2023, 5, 18) },
   ];
-  
-  // Get recent announcements for teacher's classes
-  const classIds = teacherClasses.map(c => c.id);
-  const recentAnnouncements = mockAnnouncements
-    .filter(a => classIds.includes(a.classId))
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 5);
 
+  // Fetch classes from API when component mounts
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get('/classes');
+        console.log('Fetched classes:', response.data);
+        setTeacherClasses(response.data);
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar tus clases. Por favor, inténtelo de nuevo.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClasses();
+  }, [toast]);
+  
+  if (!currentUser || currentUser.role !== 'teacher') return null;
+
+  // Function to generate color based on class name
+  const getClassColor = (className: string): string => {
+    const colors = [
+      '#4285F4', // Blue
+      '#34A853', // Green
+      '#FBBC05', // Yellow
+      '#EA4335', // Red
+      '#8E24AA', // Purple
+      '#16A2B8', // Teal
+      '#FF7043', // Deep Orange
+      '#6B7280', // Gray
+    ];
+    
+    // Simple hash function to get consistent color for same class name
+    let hash = 0;
+    for (let i = 0; i < className.length; i++) {
+      hash = className.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
+  
   return (
     <div className="container mx-auto py-8 px-4">
       <header className="mb-8">
@@ -67,36 +127,43 @@ const TeacherDashboard = () => {
             </div>
             
             <TabsContent value="classes" className="mt-2">
-              {teacherClasses.length > 0 ? (
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse">
+                      <div className="bg-slate-200 h-24"></div>
+                      <CardContent className="p-4">
+                        <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : teacherClasses.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {teacherClasses.map(classItem => (
                     <Link to={`/class/${classItem.id}`} key={classItem.id} className="block hover:no-underline">
                       <Card className="h-full hover:shadow-md transition-shadow overflow-hidden border border-gray-200">
                         <div 
                           className="p-4 h-24 flex flex-col justify-between"
-                          style={{ backgroundColor: classItem.color || '#4285F4', color: '#ffffff' }}
+                          style={{ backgroundColor: getClassColor(classItem.name), color: '#ffffff' }}
                         >
                           <div className="flex justify-between items-start">
                             <h3 className="font-semibold text-lg line-clamp-1">{classItem.name}</h3>
                             <BookOpen className="h-5 w-5 opacity-80" />
                           </div>
                           
-                          {classItem.section && (
-                            <p className="opacity-90 text-sm">{classItem.section}</p>
-                          )}
+                          <p className="opacity-90 text-sm">{classItem.semester}</p>
                         </div>
                         
                         <CardContent className="p-4 space-y-3">
-                          {classItem.subject && (
-                            <p className="text-sm text-gray-600">
-                              <span className="font-medium">Materia:</span> {classItem.subject}
-                            </p>
-                          )}
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Carrera:</span> {classItem.career_name}
+                          </p>
                           
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Users className="h-4 w-4 mr-1" />
-                            <span>{classItem.students.length} estudiantes</span>
-                          </div>
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Código:</span> {classItem.class_code}
+                          </p>
                         </CardContent>
                       </Card>
                     </Link>
@@ -225,7 +292,8 @@ const TeacherDashboard = () => {
                   <span className="text-sm">Total Estudiantes</span>
                 </div>
                 <span className="font-bold">
-                  {teacherClasses.reduce((total, c) => total + c.students.length, 0)}
+                  {/* We don't have student count yet in the API data */}
+                  0
                 </span>
               </div>
               

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -34,6 +33,7 @@ const CreateClass = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [careers, setCareers] = useState<Career[]>([]);
+  const [careersLoading, setCareersLoading] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,19 +48,10 @@ const CreateClass = () => {
   useEffect(() => {
     const fetchCareers = async () => {
       try {
-        // In production, this would be an API call to get careers
-        // For now we'll use some mock data until the careers endpoint is implemented
-        const mockCareers = [
-          { id: '1', name: 'Ingeniería en Sistemas' },
-          { id: '2', name: 'Licenciatura en Administración' },
-          { id: '3', name: 'Ingeniería Industrial' },
-          { id: '4', name: 'Licenciatura en Contaduría' },
-        ];
-        setCareers(mockCareers);
-        
-        // Uncomment when the careers API endpoint is available
-        // const response = await api.get('/careers');
-        // setCareers(response.data);
+        setCareersLoading(true);
+        // Fetch careers from API instead of using mock data
+        const response = await api.get('/careers');
+        setCareers(response.data);
       } catch (error) {
         console.error('Error fetching careers:', error);
         toast({
@@ -68,6 +59,8 @@ const CreateClass = () => {
           description: "No se pudieron cargar las carreras. Por favor, inténtelo de nuevo.",
           variant: "destructive",
         });
+      } finally {
+        setCareersLoading(false);
       }
     };
     
@@ -93,8 +86,8 @@ const CreateClass = () => {
         description: `La clase "${values.name}" ha sido creada correctamente.`,
       });
       
-      // Redirect to the dashboard
-      navigate('/dashboard');
+      // Redirect to the new class page
+      navigate(`/class/${response.data.id}`);
     } catch (error: any) {
       console.error('Error creating class:', error);
       toast({
@@ -159,6 +152,7 @@ const CreateClass = () => {
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
+                          disabled={careersLoading}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -166,11 +160,17 @@ const CreateClass = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {careers.map((career) => (
-                              <SelectItem key={career.id} value={career.id}>
-                                {career.name}
-                              </SelectItem>
-                            ))}
+                            {careersLoading ? (
+                              <SelectItem value="loading" disabled>Cargando carreras...</SelectItem>
+                            ) : careers.length === 0 ? (
+                              <SelectItem value="none" disabled>No hay carreras disponibles</SelectItem>
+                            ) : (
+                              careers.map((career) => (
+                                <SelectItem key={career.id} value={career.id}>
+                                  {career.name}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                         <FormMessage />

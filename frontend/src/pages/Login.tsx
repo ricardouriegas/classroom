@@ -72,30 +72,6 @@ const Login = () => {
     }
   };
   
-  const handleDemoLogin = async (role: 'student' | 'teacher') => {
-    try {
-      setIsLoading(true);
-      
-      const demoEmail = role === 'teacher' ? 'teacher@example.com' : 'student@example.com';
-      const demoPassword = 'password123';
-      
-      await login(demoEmail, demoPassword);
-      navigate('/dashboard');
-      toast({
-        title: "Inicio de Sesión Demo",
-        description: `Has ingresado como ${role === 'teacher' ? 'profesor' : 'estudiante'} demo.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error en Inicio de Sesión Demo",
-        description: "Hubo un error con el inicio de sesión demo. Por favor verifica que los usuarios demo existan en la base de datos.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
       <div className="w-full max-w-md animate-scale-in">
@@ -114,7 +90,6 @@ const Login = () => {
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="demo">Demo</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
@@ -170,42 +145,6 @@ const Login = () => {
                   </div>
                 </CardFooter>
               </form>
-            </TabsContent>
-            
-            <TabsContent value="demo">
-              <CardContent className="space-y-4">
-                <div className="text-center text-sm text-gray-600 mb-4">
-                  Choose a demo account to quickly try out the application.
-                </div>
-                
-                <div className="grid gap-4">
-                  <Button
-                    variant="outline"
-                    className="border-blue-200 bg-blue-50 hover:bg-blue-100 p-6 h-auto flex items-center justify-center"
-                    onClick={() => handleDemoLogin('student')}
-                    disabled={isLoading}
-                  >
-                    <div className="flex flex-col items-center">
-                      <User className="h-6 w-6 mb-2 text-blue-600" />
-                      <span className="font-medium">Student Demo</span>
-                      <span className="text-xs text-gray-500 mt-1">Access the student experience</span>
-                    </div>
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    className="border-purple-200 bg-purple-50 hover:bg-purple-100 p-6 h-auto flex items-center justify-center"
-                    onClick={() => handleDemoLogin('teacher')}
-                    disabled={isLoading}
-                  >
-                    <div className="flex flex-col items-center">
-                      <BookOpen className="h-6 w-6 mb-2 text-purple-600" />
-                      <span className="font-medium">Teacher Demo</span>
-                      <span className="text-xs text-gray-500 mt-1">Access the teacher experience</span>
-                    </div>
-                  </Button>
-                </div>
-              </CardContent>
             </TabsContent>
           </Tabs>
         </Card>
