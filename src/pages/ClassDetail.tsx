@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -8,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import { Skeleton } from '@/components/ui/skeleton';
 import AnnouncementsSection from '@/components/AnnouncementsSection';
 import ClassContentStudent from '@/components/ClassContentStudent';
+import ClassStudents from "@/components/ClassStudents";
 
 interface ClassDetails {
   id: string;
@@ -121,7 +121,7 @@ const ClassDetail = () => {
           
           {isTeacher && (
             <TabsContent value="students">
-              <div>Lista de Alumnos</div>
+              <ClassStudents />
             </TabsContent>
           )}
         </Tabs>

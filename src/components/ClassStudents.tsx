@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -382,7 +381,7 @@ export default function ClassStudents() {
                   {!bulkEnrollMode && (
                     <Button
                       size="sm"
-                      onClick={() => enrollStudent(student)}
+                      onClick={(e) => { e.stopPropagation(); enrollStudent(student); }}
                       className="flex items-center gap-1"
                     >
                       <UserPlus className="h-4 w-4" />
