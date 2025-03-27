@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -8,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AnnouncementsSection from '@/components/AnnouncementsSection';
 import ClassContentStudent from '@/components/ClassContentStudent';
 import ClassStudents from "@/components/ClassStudents";
+import TopicsSection from '@/components/TopicsSection';
 
 interface ClassDetails {
   id: string;
@@ -113,7 +115,7 @@ const ClassDetail = () => {
           
           <TabsContent value="content">
             {isTeacher ? (
-              <div>Contenido de Profesor</div>
+              <TopicsSection classId={classId!} />
             ) : (
               <ClassContentStudent classId={classId!} />
             )}

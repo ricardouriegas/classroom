@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import ClassContentStudent from './ClassContentStudent';
 
 interface Topic {
   id: string;
@@ -100,6 +98,11 @@ const TopicsSection: React.FC<TopicsSectionProps> = ({ classId }) => {
     }
   };
 
+  const handleNewAssignment = (topicId: string) => {
+    // Navigate to create assignment page with topic ID
+    window.location.href = `/class/${classId}/create-assignment?topicId=${topicId}`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -108,19 +111,16 @@ const TopicsSection: React.FC<TopicsSectionProps> = ({ classId }) => {
     );
   }
 
-  // Show student view if user is a student
-  if (!isTeacher) {
-    return <ClassContentStudent classId={classId} />;
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Temas del Curso</h2>
-        <Button onClick={() => setDialogOpen(true)} className="flex items-center gap-1">
-          <Plus className="h-4 w-4" />
-          Crear Tema
-        </Button>
+        {isTeacher && (
+          <Button onClick={() => setDialogOpen(true)} className="flex items-center gap-1">
+            <Plus className="h-4 w-4" />
+            Crear Tema
+          </Button>
+        )}
       </div>
 
       {topics.length > 0 ? (
@@ -144,16 +144,23 @@ const TopicsSection: React.FC<TopicsSectionProps> = ({ classId }) => {
                     <span>{topic.assignments_count} tareas</span>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <BookOpen className="h-4 w-4" />
-                    Agregar Material
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <FileUp className="h-4 w-4" />
-                    Agregar Tarea
-                  </Button>
-                </div>
+                {isTeacher && (
+                  <div className="flex gap-2 mt-4">
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <BookOpen className="h-4 w-4" />
+                      Agregar Material
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => handleNewAssignment(topic.id)}
+                    >
+                      <FileUp className="h-4 w-4" />
+                      Agregar Tarea
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -164,12 +171,15 @@ const TopicsSection: React.FC<TopicsSectionProps> = ({ classId }) => {
             <Layers className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-xl font-medium text-gray-700 mb-2">No hay temas creados</h3>
             <p className="text-gray-500 max-w-md mb-6">
-              Aún no has creado ningún tema para esta clase. Los temas te ayudan a organizar 
-              los materiales y tareas del curso.
+              {isTeacher 
+                ? "Aún no has creado ningún tema para esta clase. Los temas te ayudan a organizar los materiales y tareas del curso."
+                : "Aún no hay temas creados para esta clase."}
             </p>
-            <Button onClick={() => setDialogOpen(true)}>
-              Crear Primer Tema
-            </Button>
+            {isTeacher && (
+              <Button onClick={() => setDialogOpen(true)}>
+                Crear Primer Tema
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

@@ -13,6 +13,7 @@ import ClassDetail from "./pages/ClassDetail";
 import CreateClass from "./pages/CreateClass";
 import Assignments from "./pages/Assignments";
 import NotFound from "./pages/NotFound";
+import CreateAssignment from "./pages/CreateAssignment";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const AppRoutes = () => {
       <Route path="/class/:id" element={<ProtectedRoute><ClassDetail /></ProtectedRoute>} />
       <Route path="/create-class" element={<ProtectedRoute><CreateClass /></ProtectedRoute>} />
       <Route path="/assignments" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+      <Route path="/class/:id/create-assignment" element={<ProtectedRoute><CreateAssignment /></ProtectedRoute>} />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFound />} />
