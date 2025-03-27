@@ -49,9 +49,8 @@ const upload = multer({
 
 // Function to generate a URL for accessing the uploaded file
 const getFileUrl = (filename) => {
-  // In a production environment, this would include your domain
-  // For local development, we'll just use the relative path
-  return `/Users/richyslaptop/Documents/class-connect-sphere/backend/uploads/${filename}`;
+  // Return the URL path that will be handled by the static file middleware
+  return `/uploads/${filename}`;
 };
 
 // Middleware for handling file upload errors

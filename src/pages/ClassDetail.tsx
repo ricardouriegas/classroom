@@ -8,7 +8,7 @@ import Navbar from '@/components/Navbar';
 import { Skeleton } from '@/components/ui/skeleton';
 import AnnouncementsSection from '@/components/AnnouncementsSection';
 import ClassContentStudent from '@/components/ClassContentStudent';
-import ClassStudents from "@/components/ClassStudents";
+import StudentsSection from '@/components/StudentsSection';
 import TopicsSection from '@/components/TopicsSection';
 
 interface ClassDetails {
@@ -123,7 +123,7 @@ const ClassDetail = () => {
           
           {isTeacher && (
             <TabsContent value="students">
-              <ClassStudents classId={classId!} />
+              <StudentsSection classId={classId!} isTeacher={isTeacher} />
             </TabsContent>
           )}
         </Tabs>

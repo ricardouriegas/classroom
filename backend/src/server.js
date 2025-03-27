@@ -22,6 +22,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
+// Make sure the path is accessible from the frontend
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Test database connection

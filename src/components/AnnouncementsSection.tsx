@@ -102,7 +102,7 @@ const AnnouncementsSection = () => {
           </CardHeader>
           <CardContent>
             <AnnouncementForm 
-              classId={classId} 
+              classId={classId!} 
               onAnnouncementCreated={handleAnnouncementCreated} 
               onCancel={() => setShowForm(false)}
             />
