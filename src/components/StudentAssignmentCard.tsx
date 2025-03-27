@@ -1,114 +1,143 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ClipboardCheck, Clock } from 'lucide-react';
+import { format, isPast } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { Check, Clock, X, FileText, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-interface AssignmentProps {
+interface Assignment {
   id: string;
   title: string;
-  className: string;
-  classId: string;
-  dueDate: string;
-  status: 'pending' | 'submitted' | 'expired';
-  showClass?: boolean;
-  onClickView?: () => void;
+  instructions: string;
+  due_date: string;
+  topic_id: string;
+  topic_name: string;
+  class_id: string;
+  class_name: string;
+  status?: 'pending' | 'submitted' | 'graded';
+  grade?: number;
+  submitted_at?: string;
 }
 
-const StudentAssignmentCard: React.FC<AssignmentProps> = ({
-  id,
-  title,
-  className,
-  classId,
-  dueDate,
-  status,
-  showClass = true,
-  onClickView
-}) => {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return format(date, "d 'de' MMMM 'a las' HH:mm", { locale: es });
+};
 
-  const getTimeRemaining = (dueDate: string): string => {
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffMs = due.getTime() - now.getTime();
-    
-    if (diffMs < 0) return 'Vencida';
-    
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (diffDays > 0) {
-      return `${diffDays} día${diffDays > 1 ? 's' : ''} restante${diffDays > 1 ? 's' : ''}`;
-    }
-    
-    return `${diffHours} hora${diffHours > 1 ? 's' : ''} restante${diffHours > 1 ? 's' : ''}`;
-  };
+const getStatusInfo = (assignment: Assignment) => {
+  if (assignment.status === 'graded') {
+    return {
+      icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
+      text: 'Calificada',
+      color: 'bg-green-100 text-green-800',
+      grade: assignment.grade
+    };
+  }
+  
+  if (assignment.status === 'submitted') {
+    return {
+      icon: <Check className="h-5 w-5 text-blue-500" />,
+      text: 'Entregada',
+      color: 'bg-blue-100 text-blue-800'
+    };
+  }
 
+  // Is pending
+  const dueDate = new Date(assignment.due_date);
+  const isOverdue = isPast(dueDate);
+  
+  if (isOverdue) {
+    return {
+      icon: <X className="h-5 w-5 text-red-500" />,
+      text: 'No entregada',
+      color: 'bg-red-100 text-red-800'
+    };
+  }
+  
+  return {
+    icon: <Clock className="h-5 w-5 text-yellow-500" />,
+    text: 'Pendiente',
+    color: 'bg-yellow-100 text-yellow-800'
+  };
+};
+
+interface StudentAssignmentCardProps {
+  assignment: Assignment;
+  showClass?: boolean;
+}
+
+const StudentAssignmentCard: React.FC<StudentAssignmentCardProps> = ({ assignment, showClass = false }) => {
+  const navigate = useNavigate();
+  const statusInfo = getStatusInfo(assignment);
+  const dueDate = new Date(assignment.due_date);
+  const isOverdue = isPast(dueDate);
+
+  const handleClick = () => {
+    navigate(`/class/${assignment.class_id}`);
+  };
+  
   return (
-    <Card 
-      className={`hover:shadow-md transition-shadow ${
-        status === 'expired' ? 'border-red-200 bg-red-50' : ''
-      }`}
-    >
+    <Card className="h-full transition-all hover:shadow-md">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium flex items-center gap-2">
-          {status === 'expired' ? (
-            <AlertCircle className="h-5 w-5 text-red-500" />
-          ) : status === 'submitted' ? (
-            <CheckCircle className="h-5 w-5 text-green-500" />
-          ) : (
-            <ClipboardCheck className="h-5 w-5 text-blue-500" />
-          )}
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="py-2">
-        <div className="flex flex-col sm:flex-row sm:justify-between gap-2">
-          {showClass && (
-            <p className="text-sm text-gray-500">
-              <span className="font-medium">Clase:</span> {className}
-            </p>
-          )}
-          
-          <div className="flex items-center text-sm">
-            <Clock className="h-4 w-4 mr-1" />
-            <span className={status === 'expired' ? 'text-red-500' : 'text-gray-500'}>
-              {status === 'expired' 
-                ? `Vencido el ${formatDate(dueDate)}` 
-                : status === 'submitted'
-                ? `Entregado para ${formatDate(dueDate)}`
-                : `Vence el ${formatDate(dueDate)} (${getTimeRemaining(dueDate)})`}
-            </span>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{assignment.title}</CardTitle>
+            <CardDescription>
+              {showClass && (
+                <span className="block text-primary">{assignment.class_name}</span>
+              )}
+              <span className="block">Tema: {assignment.topic_name}</span>
+            </CardDescription>
           </div>
+          <Badge className={statusInfo.color}>
+            <span className="flex items-center gap-1">
+              {statusInfo.icon}
+              {statusInfo.text}
+            </span>
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center gap-1 text-sm">
+            <FileText className="h-4 w-4 text-gray-500" />
+            <p className="text-gray-600 line-clamp-1">
+              {assignment.instructions.substring(0, 70)}
+              {assignment.instructions.length > 70 ? '...' : ''}
+            </p>
+          </div>
+          
+          <div className="text-sm text-gray-600">
+            <p className={isOverdue ? 'text-red-700 font-semibold' : ''}>
+              Fecha límite: {formatDate(assignment.due_date)}
+            </p>
+            
+            {statusInfo.grade !== undefined && (
+              <p className="mt-1 font-semibold">
+                Calificación: {statusInfo.grade}/100
+              </p>
+            )}
+          </div>
+          
+          <Button 
+            variant={isOverdue && assignment.status !== 'submitted' && assignment.status !== 'graded' ? 'outline' : 'default'} 
+            className="w-full mt-2"
+            onClick={handleClick}
+            disabled={isOverdue && assignment.status !== 'submitted' && assignment.status !== 'graded'}
+          >
+            {assignment.status === 'graded' 
+              ? 'Ver calificación' 
+              : assignment.status === 'submitted'
+                ? 'Ver entrega'
+                : isOverdue 
+                  ? 'Fecha límite expirada' 
+                  : 'Ver tarea'}
+          </Button>
         </div>
       </CardContent>
-      <CardFooter>
-        <Button 
-          variant={status === 'expired' ? "outline" : "default"} 
-          size="sm" 
-          className="ml-auto"
-          disabled={status === 'expired' && !onClickView}
-          onClick={onClickView}
-          asChild={!onClickView}
-        >
-          {onClickView ? (
-            <span>{status === 'expired' ? 'Ver Detalles' : status === 'submitted' ? 'Modificar Entrega' : 'Entregar'}</span>
-          ) : (
-            <Link to={`/class/${classId}`}>
-              {status === 'expired' ? 'Ver Detalles' : 'Entregar'}
-            </Link>
-          )}
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

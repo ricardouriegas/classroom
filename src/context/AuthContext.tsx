@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -21,7 +22,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   setCurrentUser: (user: User) => void;
 }
@@ -75,30 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, []);
   
-  // Registration function
-  const register = async (name: string, email: string, password: string, role: UserRole) => {
-    setIsLoading(true);
-    try {
-      const response = await api.post('/auth/register', { name, email, password, role });
-      
-      // Check if we have both token and user data
-      if (response.data?.token && response.data?.user) {
-        setCurrentUser(response.data.user);
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        return response.data.user;
-      } else {
-        console.error('Registration response missing expected data:', response.data);
-        throw new Error("Unexpected response format from server");
-      }
-    } catch (error) {
-      console.error('Registration failed', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   // Login function
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -136,7 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!currentUser,
     isLoading,
     login,
-    register,
     logout,
     setCurrentUser
   };
