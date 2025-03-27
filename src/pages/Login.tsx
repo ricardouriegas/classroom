@@ -1,4 +1,3 @@
-
 import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -72,26 +71,6 @@ const Login = () => {
     }
   };
 
-  const loginDemoAccounts = () => {
-    return (
-      <div className="space-y-2 mt-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-medium text-gray-700">Cuentas de demostración:</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="p-2 border rounded bg-white">
-            <p className="font-semibold">Profesor</p>
-            <p>Email: teacher@example.com</p>
-            <p>Contraseña: password123</p>
-          </div>
-          <div className="p-2 border rounded bg-white">
-            <p className="font-semibold">Estudiante</p>
-            <p>Email: student@example.com</p>
-            <p>Contraseña: password123</p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
       <div className="w-full max-w-md animate-scale-in">
@@ -140,8 +119,8 @@ const Login = () => {
                   />
                 </div>
               </div>
-
-              {loginDemoAccounts()}
+              
+              {/* Se eliminó la sección de cuentas de demostración */}
             </CardContent>
             
             <CardFooter>
