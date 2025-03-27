@@ -45,7 +45,12 @@ const TeacherDashboard = () => {
   const [activeTab, setActiveTab] = useState('classes');
   const [isLoading, setIsLoading] = useState(true);
   const [teacherClasses, setTeacherClasses] = useState<ClassData[]>([]);
-  const [recentAnnouncements, setRecentAnnouncements] = useState(mockAnnouncements.slice(0, 5));
+  const [recentAnnouncements, setRecentAnnouncements] = useState(
+    mockAnnouncements.slice(0, 5).map(announcement => ({
+      ...announcement,
+      createdAt: typeof announcement.createdAt === 'string' ? announcement.createdAt : announcement.createdAt.toISOString(),
+    }))
+  );
   
   // Get pending submissions to grade (mock data - in real app would come from API)
   const pendingSubmissions = [

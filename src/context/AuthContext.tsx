@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -24,6 +23,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   setCurrentUser: (user: User) => void;
+  apiBaseUrl: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -113,7 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     login,
     logout,
-    setCurrentUser
+    setCurrentUser,
+    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000'
   };
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
