@@ -20,6 +20,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Progress } from '@/components/ui/progress';
 
 interface Topic {
   id: string;
@@ -50,6 +51,7 @@ const CreateAssignment = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Get topicId from query parameters
   const searchParams = new URLSearchParams(location.search);
@@ -132,6 +134,7 @@ const CreateAssignment = () => {
     
     try {
       setIsSubmitting(true);
+      setUploadProgress(10);
       
       // Combine date and time
       const [hours, minutes] = data.dueTime.split(':');
@@ -151,12 +154,23 @@ const CreateAssignment = () => {
         formData.append('attachments', file);
       });
       
+      // Setup progress indicator
+      const intervalId = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          return newProgress < 90 ? newProgress : prev;
+        });
+      }, 300);
+      
       // Submit form
       await api.post('/assignments', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+      
+      clearInterval(intervalId);
+      setUploadProgress(100);
       
       toast({
         title: 'Tarea creada',
@@ -172,6 +186,7 @@ const CreateAssignment = () => {
         description: 'No se pudo crear la tarea. Por favor, inténtelo de nuevo.',
         variant: 'destructive',
       });
+      setUploadProgress(0);
     } finally {
       setIsSubmitting(false);
     }

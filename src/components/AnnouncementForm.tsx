@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { id: routeClassId } = useParams<{ id: string }>();
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -139,9 +141,10 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
       const formData = new FormData();
       formData.append('title', title);
       formData.append('content', content);
-      if (classId) {
-        formData.append('classId', classId);
-      }
+      
+      // Use the class ID from props or from URL params
+      const effectiveClassId = classId || routeClassId;
+      formData.append('class_id', effectiveClassId as string);
       
       selectedFiles.forEach(file => {
         formData.append('attachments', file);
@@ -172,7 +175,9 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
         description: 'No se pudo crear el anuncio. Por favor, inténtalo de nuevo.',
         variant: 'destructive',
       });
+    } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 

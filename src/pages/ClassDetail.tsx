@@ -123,7 +123,7 @@ const ClassDetail = () => {
           
           {isTeacher && (
             <TabsContent value="students">
-              <ClassStudents />
+              <ClassStudents classId={classId!} />
             </TabsContent>
           )}
         </Tabs>

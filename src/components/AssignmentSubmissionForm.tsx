@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -152,6 +153,7 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
         description: 'No se pudo entregar la tarea. Por favor, inténtalo de nuevo.',
         variant: 'destructive',
       });
+      setUploadProgress(0);
     } finally {
       setIsSubmitting(false);
     }

@@ -29,11 +29,12 @@ const fileFilter = (req, file, cb) => {
   if (
     file.mimetype === 'image/jpeg' ||
     file.mimetype === 'image/png' ||
+    file.mimetype === 'image/gif' ||
     file.mimetype === 'application/pdf'
   ) {
     cb(null, true);
   } else {
-    cb(new Error('Unsupported file format. Only JPEG, PNG and PDF files are allowed.'), false);
+    cb(new Error('Unsupported file format. Only JPEG, PNG, GIF and PDF files are allowed.'), false);
   }
 };
 
@@ -45,6 +46,13 @@ const upload = multer({
     fileSize: process.env.MAX_FILE_SIZE || 5242880 // 5MB default limit
   }
 });
+
+// Function to generate a URL for accessing the uploaded file
+const getFileUrl = (filename) => {
+  // In a production environment, this would include your domain
+  // For local development, we'll just use the relative path
+  return `/uploads/${filename}`;
+};
 
 // Middleware for handling file upload errors
 const handleUploadError = (err, req, res, next) => {
@@ -76,5 +84,6 @@ const handleUploadError = (err, req, res, next) => {
 
 module.exports = {
   upload,
-  handleUploadError
+  handleUploadError,
+  getFileUrl
 };

@@ -1,451 +1,473 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
-import { Search, UserPlus, X, RefreshCw, UserX } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { useAuth, api } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Search, UserPlus, Mail, X, Check, AlertCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Student {
   id: string;
   name: string;
   email: string;
-  avatarUrl?: string;
-  enrollmentDate?: Date;
+  avatar_url?: string;
+  enrollment_date: string;
 }
 
-export default function ClassStudents() {
-  const { id: classId } = useParams<{ id: string }>();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [searchResults, setSearchResults] = useState<Student[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [bulkEnrollMode, setBulkEnrollMode] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState("");
+interface InvitationResponse {
+  id: string;
+  email: string;
+  status: 'pending' | 'accepted' | 'expired';
+  created_at: string;
+  expires_at: string;
+}
+
+interface ClassStudentsProps {
+  classId: string;
+}
+
+const ClassStudents: React.FC<ClassStudentsProps> = ({ classId }) => {
+  const params = useParams<{ id: string }>();
+  const effectiveClassId = classId || params.id;
+  const { currentUser } = useAuth();
   const { toast } = useToast();
+  
+  const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [pendingInvitations, setPendingInvitations] = useState<InvitationResponse[]>([]);
+  const [activeTab, setActiveTab] = useState('students');
 
-  // Load enrolled students
   useEffect(() => {
+    if (!effectiveClassId) return;
+    
+    const fetchStudents = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get(`/classes/${effectiveClassId}/students`);
+        setStudents(response.data);
+        setFilteredStudents(response.data);
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar los estudiantes. Por favor, inténtelo de nuevo.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const fetchInvitations = async () => {
+      try {
+        const response = await api.get(`/classes/${effectiveClassId}/invitations`);
+        setPendingInvitations(response.data.filter((inv: InvitationResponse) => inv.status === 'pending'));
+      } catch (error) {
+        console.error('Error fetching invitations:', error);
+      }
+    };
+
     fetchStudents();
-  }, [classId]);
+    fetchInvitations();
+  }, [effectiveClassId, toast]);
 
-  const fetchStudents = async () => {
-    if (!classId) return;
-    
-    try {
-      setIsLoading(true);
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/enrollments/class/${classId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      setStudents(response.data);
-    } catch (error) {
-      console.error("Error fetching students:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los alumnos inscritos",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      toast({
-        description: "Ingrese un nombre o matrícula para buscar",
-      });
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      setSearchResults([]);
-      
-      const response = await axios.get(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/enrollments/search?query=${encodeURIComponent(searchQuery)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      
-      // Filter out students who are already enrolled
-      const filteredResults = response.data.filter(
-        (student: Student) => !students.some((s) => s.id === student.id)
-      );
-      
-      setSearchResults(filteredResults);
-      
-      if (filteredResults.length === 0) {
-        setFeedbackMessage("No se encontraron alumnos con ese nombre o matrícula");
-      } else {
-        setFeedbackMessage("");
-      }
-    } catch (error) {
-      console.error("Error searching students:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron buscar alumnos",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const toggleStudentSelection = (studentId: string) => {
-    if (selectedStudents.includes(studentId)) {
-      setSelectedStudents(selectedStudents.filter(id => id !== studentId));
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredStudents(students);
     } else {
-      setSelectedStudents([...selectedStudents, studentId]);
+      const query = searchQuery.toLowerCase();
+      setFilteredStudents(
+        students.filter(
+          (student) =>
+            student.name.toLowerCase().includes(query) ||
+            student.email.toLowerCase().includes(query)
+        )
+      );
     }
+  }, [searchQuery, students]);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
   };
 
-  const enrollStudent = async (student: Student) => {
+  const handleInviteStudent = async () => {
+    if (!inviteEmail.trim() || !effectiveClassId) return;
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, ingresa una dirección de correo electrónico válida.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/enrollments`,
-        {
-          classId,
-          studentId: student.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      setIsInviting(true);
       
-      // Add the newly enrolled student to the list
-      setStudents([...students, {
-        id: student.id,
-        name: student.name,
-        email: student.email,
-        avatarUrl: student.avatarUrl,
-        enrollmentDate: new Date()
-      }]);
+      const response = await api.post(`/classes/${effectiveClassId}/invite`, {
+        email: inviteEmail,
+      });
       
-      // Remove from search results
-      setSearchResults(searchResults.filter((s) => s.id !== student.id));
+      setPendingInvitations([...pendingInvitations, response.data]);
       
       toast({
-        title: "Éxito",
-        description: `${student.name} ha sido inscrito en la clase`,
+        title: 'Invitación enviada',
+        description: `Se ha enviado una invitación a ${inviteEmail}.`,
       });
+      
+      setInviteEmail('');
+      setShowInviteDialog(false);
+      setActiveTab('invitations');
     } catch (error: any) {
-      console.error("Error enrolling student:", error);
-      if (error.response?.data?.error?.code === "ALREADY_ENROLLED") {
+      console.error('Error inviting student:', error);
+      
+      // Handle specific error cases
+      if (error.response?.data?.error?.code === 'USER_ALREADY_ENROLLED') {
         toast({
-          title: "Alumno ya inscrito",
-          description: `${student.name} ya está inscrito en esta clase`,
-          variant: "destructive",
+          title: 'Usuario ya inscrito',
+          description: 'Este estudiante ya está inscrito en la clase.',
+          variant: 'destructive',
+        });
+      } else if (error.response?.data?.error?.code === 'INVITATION_ALREADY_SENT') {
+        toast({
+          title: 'Invitación ya enviada',
+          description: 'Ya se ha enviado una invitación a este correo electrónico.',
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Error",
-          description: "No se pudo inscribir al alumno",
-          variant: "destructive",
+          title: 'Error',
+          description: 'No se pudo enviar la invitación. Por favor, inténtelo de nuevo.',
+          variant: 'destructive',
         });
       }
+    } finally {
+      setIsInviting(false);
     }
   };
 
-  const enrollMultipleStudents = async () => {
-    if (selectedStudents.length === 0) {
-      toast({
-        description: "Seleccione al menos un alumno para inscribir",
-      });
-      return;
-    }
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!effectiveClassId) return;
     
     try {
-      let enrolledCount = 0;
-      let errorsCount = 0;
+      await api.delete(`/classes/${effectiveClassId}/invitations/${invitationId}`);
       
-      for (const studentId of selectedStudents) {
-        const student = searchResults.find(s => s.id === studentId);
-        if (!student) continue;
-        
-        try {
-          await axios.post(
-            `${import.meta.env.VITE_API_URL}/api/enrollments`,
-            {
-              classId,
-              studentId: student.id,
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
-          
-          // Add to enrolled students
-          setStudents(prev => [...prev, {
-            id: student.id,
-            name: student.name,
-            email: student.email,
-            avatarUrl: student.avatarUrl,
-            enrollmentDate: new Date()
-          }]);
-          
-          enrolledCount++;
-        } catch (error) {
-          console.error(`Error enrolling student ${student.name}:`, error);
-          errorsCount++;
-        }
-      }
-      
-      // Remove enrolled students from search results
-      setSearchResults(prev => prev.filter(s => !selectedStudents.includes(s.id)));
-      setSelectedStudents([]);
+      // Remove the invitation from the list
+      setPendingInvitations(pendingInvitations.filter(inv => inv.id !== invitationId));
       
       toast({
-        title: "Inscripción completada",
-        description: `${enrolledCount} alumnos inscritos. ${errorsCount > 0 ? `${errorsCount} errores` : ''}`,
-        variant: errorsCount > 0 ? "destructive" : "default",
+        title: 'Invitación cancelada',
+        description: 'La invitación ha sido cancelada correctamente.',
       });
-      
-      // Refresh student list
-      fetchStudents();
     } catch (error) {
-      console.error("Error in bulk enrollment:", error);
+      console.error('Error canceling invitation:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron inscribir algunos alumnos",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo cancelar la invitación. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
       });
     }
   };
 
-  const removeStudent = async (studentId: string) => {
-    if (!confirm("¿Está seguro que desea eliminar este alumno de la clase?")) {
+  const handleResendInvitation = async (invitationId: string) => {
+    if (!effectiveClassId) return;
+    
+    try {
+      await api.post(`/classes/${effectiveClassId}/invitations/${invitationId}/resend`);
+      
+      toast({
+        title: 'Invitación reenviada',
+        description: 'La invitación ha sido reenviada correctamente.',
+      });
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo reenviar la invitación. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveStudent = async (studentId: string) => {
+    if (!effectiveClassId) return;
+    
+    if (!window.confirm('¿Estás seguro de que deseas eliminar a este estudiante de la clase?')) {
       return;
     }
     
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_URL}/api/enrollments/${classId}/${studentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      await api.delete(`/classes/${effectiveClassId}/students/${studentId}`);
       
       // Remove the student from the list
-      setStudents(students.filter((s) => s.id !== studentId));
+      setStudents(students.filter(student => student.id !== studentId));
       
       toast({
-        title: "Éxito",
-        description: "Alumno eliminado de la clase correctamente",
+        title: 'Estudiante eliminado',
+        description: 'El estudiante ha sido eliminado de la clase correctamente.',
       });
     } catch (error) {
-      console.error("Error removing student:", error);
+      console.error('Error removing student:', error);
       toast({
-        title: "Error",
-        description: "No se pudo eliminar al alumno de la clase",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo eliminar al estudiante. Por favor, inténtelo de nuevo.',
+        variant: 'destructive',
       });
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Alumnos</h2>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={fetchStudents}
-              disabled={isLoading}
-              className="flex items-center gap-1"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              Actualizar
-            </Button>
-          </div>
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-6">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
         </div>
         
-        {/* Search Form */}
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 mb-6">
-          <div className="relative flex-1 w-full">
-            <Input
-              type="text"
-              placeholder="Buscar alumnos por nombre o matrícula..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pr-10"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="mb-2">
+            <CardContent className="p-4 flex items-center">
+              <Skeleton className="h-10 w-10 rounded-full mr-4" />
+              <div className="flex-1">
+                <Skeleton className="h-5 w-48 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex justify-between items-center mb-6">
+          <TabsList>
+            <TabsTrigger value="students" className="relative">
+              Estudiantes
+              <Badge className="ml-2 bg-primary text-white">{students.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="invitations" className="relative">
+              Invitaciones
+              {pendingInvitations.length > 0 && (
+                <Badge className="ml-2 bg-amber-500 text-white">{pendingInvitations.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <Button onClick={() => setShowInviteDialog(true)} className="flex items-center gap-1">
+            <UserPlus className="h-4 w-4" />
+            Invitar Estudiante
+          </Button>
+        </div>
+        
+        <TabsContent value="students" className="space-y-4">
+          {students.length > 0 ? (
+            <>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Buscar estudiantes..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="pl-10"
+                />
+              </div>
+              
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map((student) => (
+                  <Card key={student.id} className="mb-2">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Avatar className="h-10 w-10 mr-4">
+                          <AvatarImage src={student.avatar_url} alt={student.name} />
+                          <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-medium">{student.name}</h3>
+                          <p className="text-sm text-gray-500">{student.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">
+                          Inscrito el {formatDate(student.enrollment_date)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveStudent(student.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No se encontraron estudiantes con esa búsqueda.</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <UserPlus className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay estudiantes inscritos</h3>
+              <p className="text-gray-500 max-w-md mx-auto mb-6">
+                Aún no hay estudiantes inscritos en esta clase. Invita a tus estudiantes para comenzar.
+              </p>
+              <Button onClick={() => setShowInviteDialog(true)}>
+                Invitar Estudiantes
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="invitations" className="space-y-4">
+          {pendingInvitations.length > 0 ? (
+            pendingInvitations.map((invitation) => (
+              <Card key={invitation.id} className="mb-2">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Mail className="h-5 w-5 mr-4 text-amber-500" />
+                    <div>
+                      <h3 className="font-medium">{invitation.email}</h3>
+                      <p className="text-sm text-gray-500">
+                        Enviada el {formatDate(invitation.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                      Pendiente
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleResendInvitation(invitation.id)}
+                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Mail className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCancelInvitation(invitation.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <Mail className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay invitaciones pendientes</h3>
+              <p className="text-gray-500 max-w-md mx-auto mb-6">
+                No hay invitaciones pendientes para esta clase.
+              </p>
+              <Button onClick={() => setShowInviteDialog(true)}>
+                Invitar Estudiantes
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+      
+      {/* Invite Student Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invitar Estudiante</DialogTitle>
+            <DialogDescription>
+              Envía una invitación por correo electrónico para que un estudiante se una a esta clase.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo electrónico</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="estudiante@ejemplo.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex items-center text-sm text-amber-600 bg-amber-50 p-3 rounded-md">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <p>
+                Si el estudiante no tiene una cuenta, se le invitará a crear una.
+              </p>
             </div>
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <Button onClick={handleSearch} disabled={isSearching} className="flex-1 md:flex-none">
-              {isSearching ? (
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowInviteDialog(false)}
+              disabled={isInviting}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleInviteStudent}
+              disabled={!inviteEmail.trim() || isInviting}
+            >
+              {isInviting ? (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                  Buscando...
+                  <span className="animate-spin mr-2">⏳</span>
+                  Enviando...
                 </>
               ) : (
-                "Buscar"
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Enviar Invitación
+                </>
               )}
             </Button>
-            {searchResults.length > 0 && (
-              <Button
-                variant={bulkEnrollMode ? "default" : "outline"}
-                onClick={() => setBulkEnrollMode(!bulkEnrollMode)}
-                className="flex-1 md:flex-none"
-              >
-                {bulkEnrollMode ? "Cancelar selección" : "Selección múltiple"}
-              </Button>
-            )}
-          </div>
-        </div>
-        
-        {/* Feedback message */}
-        {feedbackMessage && (
-          <div className="mb-4 p-3 bg-slate-100 dark:bg-slate-700 rounded text-center">
-            {feedbackMessage}
-          </div>
-        )}
-        
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="mb-8 border rounded-md overflow-hidden">
-            <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 font-medium flex justify-between items-center">
-              <span>Resultados de búsqueda ({searchResults.length})</span>
-              {bulkEnrollMode && selectedStudents.length > 0 && (
-                <Button size="sm" onClick={enrollMultipleStudents}>
-                  Inscribir seleccionados ({selectedStudents.length})
-                </Button>
-              )}
-            </div>
-            <ul className="divide-y">
-              {searchResults.map((student) => (
-                <li 
-                  key={student.id} 
-                  className={`flex items-center justify-between px-4 py-3 ${
-                    bulkEnrollMode && selectedStudents.includes(student.id) 
-                      ? "bg-blue-50 dark:bg-blue-900/20" 
-                      : ""
-                  }`}
-                  onClick={bulkEnrollMode ? () => toggleStudentSelection(student.id) : undefined}
-                  style={bulkEnrollMode ? { cursor: "pointer" } : undefined}
-                >
-                  <div className="flex items-center gap-3">
-                    {bulkEnrollMode && (
-                      <input 
-                        type="checkbox" 
-                        checked={selectedStudents.includes(student.id)}
-                        onChange={() => toggleStudentSelection(student.id)}
-                        className="h-4 w-4"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )}
-                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                      {student.avatarUrl ? (
-                        <img
-                          src={student.avatarUrl}
-                          alt={student.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">
-                          {student.name.charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-slate-500">{student.email}</p>
-                    </div>
-                  </div>
-                  {!bulkEnrollMode && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); enrollStudent(student); }}
-                      className="flex items-center gap-1"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Agregar
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {/* Enrolled Students List */}
-        <div className="border rounded-md overflow-hidden">
-          <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 font-medium">
-            Alumnos Inscritos ({students.length})
-          </div>
-          {isLoading ? (
-            <div className="p-6 text-center">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto text-slate-400 mb-2" />
-              <p>Cargando alumnos...</p>
-            </div>
-          ) : students.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">
-              <p>No hay alumnos inscritos en esta clase.</p>
-              <p className="text-sm mt-2">Use la búsqueda arriba para agregar alumnos.</p>
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {students.map((student) => (
-                <li key={student.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                      {student.avatarUrl ? (
-                        <img
-                          src={student.avatarUrl}
-                          alt={student.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">
-                          {student.name.charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-slate-500">{student.email}</p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => removeStudent(student.id)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <UserX className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};
+
+export default ClassStudents;
