@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
@@ -140,6 +139,8 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
     const userId = req.user.id;
     const files = req.files || [];
 
+    console.log('Assignment creation payload:', { class_id, topic_id, title, description, due_date, files });
+
     // Check if user is a teacher
     if (req.user.role !== 'teacher') {
       return res.status(403).json({
@@ -210,9 +211,10 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
     try {
       // Insert assignment into database
+      // Corrección: Modificar la consulta para coincidir con la estructura real de la base de datos
       await connection.query(
-        'INSERT INTO assignments (id, class_id, topic_id, title, description, due_date) VALUES (?, ?, ?, ?, ?, ?)',
-        [assignmentId, class_id, topic_id, title, description, due_date]
+        'INSERT INTO assignments (id, class_id, topic_id, title, instructions, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [assignmentId, class_id, topic_id, title, description, due_date, userId]
       );
 
       // Process file attachments
@@ -259,6 +261,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
       res.status(201).json(assignment);
     } catch (error) {
       await connection.rollback();
+      console.error('Transaction error:', error);
       throw error;
     } finally {
       connection.release();
@@ -267,7 +270,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
     console.error('Error creating assignment:', error);
     res.status(500).json({
       error: {
-        message: 'Error creating assignment',
+        message: 'Error creating assignment: ' + error.message,
         code: 'SERVER_ERROR'
       }
     });

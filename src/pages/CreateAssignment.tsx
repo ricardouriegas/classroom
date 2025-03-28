@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -149,6 +148,15 @@ const CreateAssignment = () => {
       formData.append('description', data.description);
       formData.append('due_date', dueDate.toISOString());
       
+      // Log the data being sent for debugging
+      console.log('Assignment data:', {
+        class_id: classId,
+        topic_id: data.topicId,
+        title: data.title,
+        description: data.description,
+        due_date: dueDate.toISOString()
+      });
+      
       // Add files to form data
       files.forEach(file => {
         formData.append('attachments', file);
@@ -162,8 +170,8 @@ const CreateAssignment = () => {
         });
       }, 300);
       
-      // Submit form
-      await api.post('/assignments', formData, {
+      // Submit form with proper Content-Type header
+      const response = await api.post('/assignments', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -172,18 +180,28 @@ const CreateAssignment = () => {
       clearInterval(intervalId);
       setUploadProgress(100);
       
+      console.log('Assignment created:', response.data);
+      
       toast({
         title: 'Tarea creada',
         description: 'La tarea se ha creado correctamente.',
       });
       
       // Navigate back to class
-      navigate(`/class/${classId}`);
+      setTimeout(() => {
+        navigate(`/class/${classId}`);
+      }, 1000);
     } catch (error) {
       console.error('Error creating assignment:', error);
+      
+      let errorMessage = 'No se pudo crear la tarea. Por favor, inténtelo de nuevo.';
+      if (error.response && error.response.data && error.response.data.error) {
+        errorMessage = error.response.data.error.message || errorMessage;
+      }
+      
       toast({
         title: 'Error',
-        description: 'No se pudo crear la tarea. Por favor, inténtelo de nuevo.',
+        description: errorMessage,
         variant: 'destructive',
       });
       setUploadProgress(0);
