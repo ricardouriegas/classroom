@@ -1,4 +1,3 @@
-
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -26,7 +25,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Check user existence
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const [users] = await pool.query('SELECT * FROM tbl_users WHERE email = ?', [email]);
     
     if (users.length === 0) {
       return res.status(400).json({

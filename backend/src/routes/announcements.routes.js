@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
@@ -8,18 +7,12 @@ const path = require('path');
 
 const router = express.Router();
 
-/**
- * @route   POST /api/announcements
- * @desc    Create a new announcement with optional attachments
- * @access  Private (Teachers only)
- */
 router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res) => {
   try {
     const { class_id, title, content } = req.body;
     const userId = req.user.id;
     const files = req.files || [];
 
-    // Check if user is a teacher
     if (req.user.role !== 'teacher') {
       return res.status(403).json({
         error: {
@@ -29,7 +22,6 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
       });
     }
 
-    // Validate input
     if (!class_id || !title || !content) {
       return res.status(400).json({
         error: {
@@ -39,9 +31,8 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
       });
     }
 
-    // Check if the teacher owns this class
     const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
       [class_id, userId]
     );
     
@@ -54,28 +45,24 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
       });
     }
 
-    // Generate a unique announcement ID
     const announcementId = crypto.randomUUID();
     
-    // Begin transaction
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
     try {
-      // Insert announcement into database
       await connection.query(
-        'INSERT INTO announcements (id, class_id, teacher_id, title, content) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO tbl_announcements (id, class_id, teacher_id, title, content) VALUES (?, ?, ?, ?, ?)',
         [announcementId, class_id, userId, title, content]
       );
 
-      // Process file attachments
       const attachments = [];
       for (const file of files) {
         const attachmentId = crypto.randomUUID();
         const fileUrl = getFileUrl(file.filename);
         
         await connection.query(
-          'INSERT INTO announcement_attachments (id, announcement_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tbl_announcement_attachments (id, announcement_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
           [attachmentId, announcementId, file.originalname, file.size, file.mimetype, fileUrl]
         );
         
@@ -90,13 +77,11 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
       await connection.commit();
 
-      // Get teacher info for response
       const [teacherInfo] = await pool.query(
-        'SELECT name, avatar_url FROM users WHERE id = ?',
+        'SELECT name, avatar_url FROM tbl_users WHERE id = ?',
         [userId]
       );
 
-      // Format response
       const announcement = {
         id: announcementId,
         classId: class_id,
@@ -127,29 +112,23 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
   }
 });
 
-/**
- * @route   GET /api/announcements/class/:classId
- * @desc    Get all announcements for a class
- * @access  Private (Class members only)
- */
 router.get('/class/:classId', authMiddleware, async (req, res) => {
   try {
     const { classId } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // Check if the user has access to this class
     let hasAccess = false;
     
     if (userRole === 'teacher') {
       const [teacherCheck] = await pool.query(
-        'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+        'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
         [classId, userId]
       );
       hasAccess = teacherCheck.length > 0;
     } else if (userRole === 'student') {
       const [studentCheck] = await pool.query(
-        'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+        'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
         [classId, userId]
       );
       hasAccess = studentCheck.length > 0;
@@ -164,26 +143,17 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Get all announcements for the class
-    const [announcements] = await pool.query(`
-      SELECT a.id, a.title, a.content, a.created_at,
-             u.id as author_id, u.name as author_name, u.avatar_url as author_avatar
-      FROM announcements a
-      JOIN users u ON a.teacher_id = u.id
-      WHERE a.class_id = ?
-      ORDER BY a.created_at DESC
-    `, [classId]);
+    const query = "SELECT * FROM tbl_announcements WHERE class_id = ?";
+    const [announcements] = await pool.query(query, [classId]);
 
-    // Get attachments for each announcement
     const formattedAnnouncements = [];
     for (const announcement of announcements) {
       const [attachments] = await pool.query(`
         SELECT id, file_name, file_size, file_type, file_url
-        FROM announcement_attachments
+        FROM tbl_announcement_attachments
         WHERE announcement_id = ?
       `, [announcement.id]);
 
-      // Format attachments
       const formattedAttachments = attachments.map(attachment => ({
         id: attachment.id,
         fileName: attachment.file_name,
@@ -192,7 +162,6 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
         fileUrl: attachment.file_url
       }));
 
-      // Format announcement
       formattedAnnouncements.push({
         id: announcement.id,
         title: announcement.title,

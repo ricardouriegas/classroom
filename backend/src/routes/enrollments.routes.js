@@ -36,7 +36,7 @@ router.get('/search', authMiddleware, async (req, res) => {
     // Search for students by name or ID (email)
     const [students] = await pool.query(`
       SELECT id, name, email, avatar_url
-      FROM users
+      FROM tbl_users
       WHERE role = 'student' AND (
         name LIKE ? OR
         email LIKE ? OR
@@ -87,7 +87,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
 
     // Check if the teacher owns this class
     const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
       [classId, userId]
     );
     
@@ -103,8 +103,8 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
     // Get all students enrolled in the class
     const [enrolledStudents] = await pool.query(`
       SELECT u.id, u.name, u.email, u.avatar_url, e.enrollment_date
-      FROM class_enrollments e
-      JOIN users u ON e.student_id = u.id
+      FROM tbl_class_enrollments e
+      JOIN tbl_users u ON e.student_id = u.id
       WHERE e.class_id = ?
       ORDER BY u.name ASC
     `, [classId]);
@@ -162,7 +162,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // Check if the teacher owns this class
     const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
       [classId, userId]
     );
     
@@ -177,7 +177,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // Check if the student exists and is a student
     const [studentCheck] = await pool.query(
-      'SELECT id FROM users WHERE id = ? AND role = "student"',
+      'SELECT id FROM tbl_users WHERE id = ? AND role = "student"',
       [studentId]
     );
     
@@ -192,7 +192,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // Check if the student is already enrolled
     const [enrollmentCheck] = await pool.query(
-      'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+      'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
       [classId, studentId]
     );
     
@@ -208,14 +208,14 @@ router.post('/', authMiddleware, async (req, res) => {
     // Create enrollment
     const enrollmentId = crypto.randomUUID();
     await pool.query(
-      'INSERT INTO class_enrollments (id, class_id, student_id) VALUES (?, ?, ?)',
+      'INSERT INTO tbl_class_enrollments (id, class_id, student_id) VALUES (?, ?, ?)',
       [enrollmentId, classId, studentId]
     );
 
     // Get student details for response
     const [studentDetails] = await pool.query(`
       SELECT id, name, email, avatar_url
-      FROM users
+      FROM tbl_users
       WHERE id = ?
     `, [studentId]);
 
@@ -266,7 +266,7 @@ router.delete('/:classId/:studentId', authMiddleware, async (req, res) => {
 
     // Check if the teacher owns this class
     const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
       [classId, userId]
     );
     
@@ -281,7 +281,7 @@ router.delete('/:classId/:studentId', authMiddleware, async (req, res) => {
 
     // Check if the enrollment exists
     const [enrollmentCheck] = await pool.query(
-      'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+      'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
       [classId, studentId]
     );
     
@@ -296,7 +296,7 @@ router.delete('/:classId/:studentId', authMiddleware, async (req, res) => {
 
     // Remove enrollment
     await pool.query(
-      'DELETE FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+      'DELETE FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
       [classId, studentId]
     );
 

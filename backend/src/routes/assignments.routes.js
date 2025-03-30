@@ -22,13 +22,13 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
     
     if (userRole === 'teacher') {
       const [teacherCheck] = await pool.query(
-        'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+        'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
         [classId, userId]
       );
       hasAccess = teacherCheck.length > 0;
     } else if (userRole === 'student') {
       const [studentCheck] = await pool.query(
-        'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+        'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
         [classId, userId]
       );
       hasAccess = studentCheck.length > 0;
@@ -49,10 +49,10 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
     if (userRole === 'teacher') {
       const [teacherAssignments] = await pool.query(`
         SELECT a.*, t.name as topic_name, 
-               (SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id = a.id) as submissions_count
-        FROM assignments a
-        JOIN topics t ON a.topic_id = t.id
-        WHERE a.class_id = ?
+               (SELECT COUNT(*) FROM tbl_assignment_submissions WHERE assignment_id = a.id) as submissions_count
+        FROM tbl_assignments a
+        JOIN tbl_topics t ON a.topic_id = t.id
+        WHERE t.class_id = ?
         ORDER BY a.due_date DESC
       `, [classId]);
       
@@ -67,10 +67,10 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
                  ELSE 'pending' 
                END as status,
                s.submission_date, s.grade, s.feedback
-        FROM assignments a
-        JOIN topics t ON a.topic_id = t.id
-        LEFT JOIN assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
-        WHERE a.class_id = ?
+        FROM tbl_assignments a
+        JOIN tbl_topics t ON a.topic_id = t.id
+        LEFT JOIN tbl_assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
+        WHERE t.class_id = ?
         ORDER BY a.due_date DESC
       `, [userId, classId]);
       
@@ -82,7 +82,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
     for (const assignment of assignments) {
       const [attachments] = await pool.query(`
         SELECT id, file_name, file_size, file_type, file_url
-        FROM assignment_attachments
+        FROM tbl_assignment_attachments
         WHERE assignment_id = ?
       `, [assignment.id]);
 
@@ -174,7 +174,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
     // Check if the teacher owns this class
     const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
       [class_id, userId]
     );
     
@@ -189,7 +189,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
     // Check if the topic exists and belongs to the class
     const [topicCheck] = await pool.query(
-      'SELECT id FROM topics WHERE id = ? AND class_id = ?',
+      'SELECT id FROM tbl_topics WHERE id = ? AND class_id = ?',
       [topic_id, class_id]
     );
     
@@ -211,10 +211,9 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
     try {
       // Insert assignment into database
-      // Corrección: Modificar la consulta para coincidir con la estructura real de la base de datos
       await connection.query(
-        'INSERT INTO assignments (id, class_id, topic_id, title, instructions, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [assignmentId, class_id, topic_id, title, description, due_date, userId]
+        'INSERT INTO tbl_assignments (id, topic_id, title, instructions, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        [assignmentId, topic_id, title, description, due_date, userId]
       );
 
       // Process file attachments
@@ -224,8 +223,8 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
         const fileUrl = getFileUrl(file.filename);
         
         await connection.query(
-          'INSERT INTO assignment_attachments (id, assignment_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
-          [attachmentId, assignmentId, file.originalname, file.size, file.mimetype, fileUrl]
+          'INSERT INTO tbl_assignment_attachments (id, assignment_id, file_name, file_path, file_size, file_type, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+          [attachmentId, assignmentId, file.originalname, fileUrl, file.size, file.mimetype]
         );
         
         attachments.push({
@@ -241,7 +240,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
       // Get topic name for response
       const [topicInfo] = await pool.query(
-        'SELECT name FROM topics WHERE id = ?',
+        'SELECT name FROM tbl_topics WHERE id = ?',
         [topic_id]
       );
 
@@ -301,9 +300,9 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
 
     // Verify assignment exists
     const [assignmentCheck] = await pool.query(
-      `SELECT a.*, c.id as class_id 
-       FROM assignments a 
-       JOIN classes c ON a.class_id = c.id 
+      `SELECT a.*, t.class_id 
+       FROM tbl_assignments a 
+       JOIN tbl_topics t ON a.topic_id = t.id 
        WHERE a.id = ?`,
       [assignmentId]
     );
@@ -321,7 +320,7 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
     
     // Check if the student is enrolled in the class
     const [enrollmentCheck] = await pool.query(
-      'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+      'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
       [assignment.class_id, userId]
     );
     
@@ -347,7 +346,7 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
 
     // Check if the student has already submitted this assignment
     const [submissionCheck] = await pool.query(
-      'SELECT id FROM assignment_submissions WHERE assignment_id = ? AND student_id = ?',
+      'SELECT id FROM tbl_assignment_submissions WHERE assignment_id = ? AND student_id = ?',
       [assignmentId, userId]
     );
     
@@ -363,13 +362,13 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
         submissionId = submissionCheck[0].id;
         
         await connection.query(
-          'UPDATE assignment_submissions SET comment = ?, submission_date = NOW(), grade = NULL WHERE id = ?',
+          'UPDATE tbl_assignment_submissions SET comment = ?, submission_date = NOW(), grade = NULL WHERE id = ?',
           [comment || null, submissionId]
         );
         
         // Delete old submission files
         await connection.query(
-          'DELETE FROM submission_files WHERE submission_id = ?',
+          'DELETE FROM tbl_submission_attachments WHERE submission_id = ?',
           [submissionId]
         );
       } else {
@@ -377,7 +376,7 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
         submissionId = crypto.randomUUID();
         
         await connection.query(
-          'INSERT INTO assignment_submissions (id, assignment_id, student_id, comment, submission_date) VALUES (?, ?, ?, ?, NOW())',
+          'INSERT INTO tbl_assignment_submissions (id, assignment_id, student_id, comment, submission_date) VALUES (?, ?, ?, ?, NOW())',
           [submissionId, assignmentId, userId, comment || null]
         );
       }
@@ -389,7 +388,7 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
         const fileUrl = getFileUrl(file.filename);
         
         await connection.query(
-          'INSERT INTO submission_files (id, submission_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tbl_submission_attachments (id, submission_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
           [fileId, submissionId, file.originalname, file.size, file.mimetype, fileUrl]
         );
         
@@ -460,11 +459,11 @@ router.get('/student', authMiddleware, async (req, res) => {
                ELSE 'pending' 
              END as status,
              s.submission_date, s.grade, s.feedback
-      FROM assignments a
-      JOIN topics t ON a.topic_id = t.id
-      JOIN classes c ON a.class_id = c.id
-      JOIN class_enrollments e ON c.id = e.class_id
-      LEFT JOIN assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
+      FROM tbl_assignments a
+      JOIN tbl_topics t ON a.topic_id = t.id
+      JOIN tbl_classes c ON t.class_id = c.id
+      JOIN tbl_class_enrollments e ON c.id = e.class_id
+      LEFT JOIN tbl_assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
       WHERE e.student_id = ?
       ORDER BY a.due_date ASC
     `, [userId, userId]);
@@ -474,7 +473,7 @@ router.get('/student', authMiddleware, async (req, res) => {
       // Get assignment attachments
       const [attachments] = await pool.query(`
         SELECT id, file_name, file_size, file_type, file_url
-        FROM assignment_attachments
+        FROM tbl_assignment_attachments
         WHERE assignment_id = ?
       `, [assignment.id]);
 
@@ -491,14 +490,14 @@ router.get('/student', authMiddleware, async (req, res) => {
       let submissionFiles = [];
       if (assignment.status === 'submitted') {
         const [submission] = await pool.query(`
-          SELECT id FROM assignment_submissions 
+          SELECT id FROM tbl_assignment_submissions 
           WHERE assignment_id = ? AND student_id = ?
         `, [assignment.id, userId]);
         
         if (submission.length > 0) {
           const [files] = await pool.query(`
             SELECT id, file_name, file_size, file_type, file_url
-            FROM submission_files
+            FROM tbl_submission_attachments
             WHERE submission_id = ?
           `, [submission[0].id]);
           
@@ -565,9 +564,10 @@ router.get('/:id/submissions', authMiddleware, async (req, res) => {
 
     // Verify assignment exists and belongs to one of the teacher's classes
     const [assignmentCheck] = await pool.query(`
-      SELECT a.*, c.id as class_id 
-      FROM assignments a 
-      JOIN classes c ON a.class_id = c.id 
+      SELECT a.*, t.class_id, c.teacher_id 
+      FROM tbl_assignments a 
+      JOIN tbl_topics t ON a.topic_id = t.id 
+      JOIN tbl_classes c ON t.class_id = c.id
       WHERE a.id = ? AND c.teacher_id = ?
     `, [assignmentId, userId]);
     
@@ -583,8 +583,8 @@ router.get('/:id/submissions', authMiddleware, async (req, res) => {
     // Get all submissions for this assignment
     const [submissions] = await pool.query(`
       SELECT s.*, u.name as student_name, u.email as student_email, u.avatar_url as student_avatar
-      FROM assignment_submissions s
-      JOIN users u ON s.student_id = u.id
+      FROM tbl_assignment_submissions s
+      JOIN tbl_users u ON s.student_id = u.id
       WHERE s.assignment_id = ?
       ORDER BY s.submission_date DESC
     `, [assignmentId]);
@@ -594,7 +594,7 @@ router.get('/:id/submissions', authMiddleware, async (req, res) => {
       // Get submission files
       const [files] = await pool.query(`
         SELECT id, file_name, file_size, file_type, file_url
-        FROM submission_files
+        FROM tbl_submission_attachments
         WHERE submission_id = ?
       `, [submission.id]);
       
@@ -668,10 +668,11 @@ router.post('/:submissionId/grade', authMiddleware, async (req, res) => {
 
     // Verify submission exists and belongs to a class taught by this teacher
     const [submissionCheck] = await pool.query(`
-      SELECT s.*, a.class_id
-      FROM assignment_submissions s
-      JOIN assignments a ON s.assignment_id = a.id
-      JOIN classes c ON a.class_id = c.id
+      SELECT s.*, t.class_id
+      FROM tbl_assignment_submissions s
+      JOIN tbl_assignments a ON s.assignment_id = a.id
+      JOIN tbl_topics t ON a.topic_id = t.id
+      JOIN tbl_classes c ON t.class_id = c.id
       WHERE s.id = ? AND c.teacher_id = ?
     `, [submissionId, userId]);
     
@@ -686,16 +687,16 @@ router.post('/:submissionId/grade', authMiddleware, async (req, res) => {
 
     // Update submission with grade and feedback
     await pool.query(
-      'UPDATE assignment_submissions SET grade = ?, feedback = ? WHERE id = ?',
+      'UPDATE tbl_assignment_submissions SET grade = ?, feedback = ? WHERE id = ?',
       [grade, feedback || null, submissionId]
     );
 
     // Get updated submission info
     const [updatedSubmission] = await pool.query(`
       SELECT s.*, a.title as assignment_title, u.name as student_name, u.email as student_email
-      FROM assignment_submissions s
-      JOIN assignments a ON s.assignment_id = a.id
-      JOIN users u ON s.student_id = u.id
+      FROM tbl_assignment_submissions s
+      JOIN tbl_assignments a ON s.assignment_id = a.id
+      JOIN tbl_users u ON s.student_id = u.id
       WHERE s.id = ?
     `, [submissionId]);
 

@@ -1,48 +1,86 @@
+/**
+ * Authentication Middleware
+ * Verifies user JWT tokens and adds user context to requests
+ */
+
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/db');
 
-const authMiddleware = async (req, res, next) => {
+/**
+ * Authentication middleware function
+ * @async
+ */
+const authenticate = async (req, res, next) => {
+  // Extract token from Authorization header
+  const authHeader = req.header('Authorization');
+  const token = authHeader?.startsWith('Bearer ') 
+    ? authHeader.substring(7) 
+    : null;
+  
+  // Check if token exists
+  if (!token) {
+    return res.status(401).json({ 
+      error: {
+        message: 'Authentication required: No token provided',
+        code: 'UNAUTHORIZED'
+      }
+    });
+  }
+
   try {
-    // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Verify and decode token
+    const JWT_SECRET = process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, JWT_SECRET);
     
-    if (!token) {
+    // Attach user data to request object
+    req.user = decoded;
+    
+    // Optional: Verify user still exists in database
+    await _verifyUserExists(decoded.id);
+    
+    // Proceed to next middleware/route handler
+    next();
+  } catch (error) {
+    console.error('🔐 Authentication error:', error.message);
+    
+    // Determine appropriate error response
+    if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ 
         error: {
-          message: 'No token provided, authorization denied',
-          code: 'UNAUTHORIZED'
+          message: 'Token has expired, please login again',
+          code: 'TOKEN_EXPIRED'
         }
       });
     }
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Add user data to request
-    req.user = decoded;
-    
-    // Check if user exists in database (optional but recommended)
-    try {
-      const [userExists] = await pool.query('SELECT id FROM users WHERE id = ?', [decoded.id]);
-      
-      if (userExists.length === 0) {
-        console.warn(`Auth Warning: User with ID ${decoded.id} not found in database but has valid token`);
-      }
-    } catch (dbError) {
-      console.error('Database check error in auth middleware:', dbError);
-      // Continue despite error - we don't want db errors to prevent auth
-    }
-    
-    next();
-  } catch (error) {
-    console.error('Auth error:', error);
-    res.status(401).json({ 
+    // Generic token validation error
+    return res.status(401).json({ 
       error: {
-        message: 'Token is not valid',
+        message: 'Invalid authentication token',
         code: 'INVALID_TOKEN'
       }
     });
   }
 };
 
-module.exports = authMiddleware;
+/**
+ * Helper function to verify user exists in database
+ * @private
+ */
+async function _verifyUserExists(userId) {
+  try {
+    const [result] = await pool.query(
+      'SELECT id FROM tbl_users WHERE id = ?', 
+      [userId]
+    );
+    
+    if (result.length === 0) {
+      console.warn(`⚠️ Auth warning: User with ID ${userId} has valid token but doesn't exist in database`);
+    }
+  } catch (dbError) {
+    // Log but continue - we don't want DB errors to prevent authentication
+    console.error('⚠️ Database check error in auth middleware:', dbError.message);
+  }
+}
+
+module.exports = authenticate;

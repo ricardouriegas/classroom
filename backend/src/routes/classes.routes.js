@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
+const crypto = require('crypto'); // Native crypto module as fallback
 
 const router = express.Router();
 
@@ -19,8 +20,8 @@ router.get('/', authMiddleware, async (req, res) => {
       // Get classes where user is a teacher
       const [teacherClasses] = await pool.query(`
         SELECT c.*, car.name as career_name
-        FROM classes c
-        JOIN careers car ON c.career_id = car.id
+        FROM tbl_classes c
+        JOIN tbl_careers car ON c.career_id = car.id
         WHERE c.teacher_id = ?
       `, [userId]);
       classes = teacherClasses;
@@ -28,10 +29,10 @@ router.get('/', authMiddleware, async (req, res) => {
       // Get classes where user is enrolled as a student
       const [studentClasses] = await pool.query(`
         SELECT c.*, car.name as career_name, u.name as teacher_name
-        FROM classes c
-        JOIN careers car ON c.career_id = car.id
-        JOIN users u ON c.teacher_id = u.id
-        JOIN class_enrollments e ON c.id = e.class_id
+        FROM tbl_classes c
+        JOIN tbl_careers car ON c.career_id = car.id
+        JOIN tbl_users u ON c.teacher_id = u.id
+        JOIN tbl_class_enrollments e ON c.id = e.class_id
         WHERE e.student_id = ?
       `, [userId]);
       classes = studentClasses;
@@ -83,7 +84,7 @@ router.post('/', authMiddleware, async (req, res) => {
     
     // Verify the teacher exists in the database
     const [teacherExists] = await pool.query(
-      'SELECT id FROM users WHERE id = ? AND role = "teacher"',
+      'SELECT id FROM tbl_users WHERE id = ? AND role = "teacher"',
       [teacherId]
     );
     
@@ -98,20 +99,21 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Generate a unique class ID and class code
-    const classId = require('crypto').randomUUID();
+    // Using crypto.randomUUID() instead of the uuid package (added in Node.js 14.17.0+)
+    const classId = crypto.randomUUID();
     const classCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     // Insert class into database
     await pool.query(
-      'INSERT INTO classes (id, name, description, class_code, career_id, semester, teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO tbl_classes (id, name, description, class_code, career_id, semester, teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [classId, name, description || '', classCode, career_id, semester, teacherId]
     );
 
     // Get the created class with career info
     const [newClass] = await pool.query(`
       SELECT c.*, car.name as career_name
-      FROM classes c
-      JOIN careers car ON c.career_id = car.id
+      FROM tbl_classes c
+      JOIN tbl_careers car ON c.career_id = car.id
       WHERE c.id = ?
     `, [classId]);
 
@@ -143,13 +145,13 @@ router.get('/:id', authMiddleware, async (req, res) => {
     
     if (userRole === 'teacher') {
       const [teacherCheck] = await pool.query(
-        'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
+        'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
         [classId, userId]
       );
       hasAccess = teacherCheck.length > 0;
     } else if (userRole === 'student') {
       const [studentCheck] = await pool.query(
-        'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
+        'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
         [classId, userId]
       );
       hasAccess = studentCheck.length > 0;
@@ -167,9 +169,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
     // Get class details
     const [classDetails] = await pool.query(`
       SELECT c.*, car.name as career_name, u.name as teacher_name
-      FROM classes c
-      JOIN careers car ON c.career_id = car.id
-      JOIN users u ON c.teacher_id = u.id
+      FROM tbl_classes c
+      JOIN tbl_careers car ON c.career_id = car.id
+      JOIN tbl_users u ON c.teacher_id = u.id
       WHERE c.id = ?
     `, [classId]);
 

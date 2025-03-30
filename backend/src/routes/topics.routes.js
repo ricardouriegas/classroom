@@ -1,63 +1,54 @@
+/**
+ * Topics API Routes
+ * Handles topic creation and management for classes
+ */
 
 const express = require('express');
 const { pool } = require('../config/db');
-const authMiddleware = require('../middleware/auth');
+const authenticate = require('../middleware/auth');
+const crypto = require('crypto'); // Use native crypto instead of uuid
 
+// Initialize router
 const router = express.Router();
 
 /**
- * @route   GET /api/classes/:id/topics
- * @desc    Get all topics for a class
- * @access  Private
+ * Retrieves all topics for a specific class with material and assignment counts
  */
-router.get('/class/:classId', authMiddleware, async (req, res) => {
+router.get('/class/:classId', authenticate, async (req, res) => {
+  const { classId } = req.params;
+  const { id: userId, role: userRole } = req.user;
+
   try {
-    const { classId } = req.params;
-    const userId = req.user.id;
-    const userRole = req.user.role;
-
-    // Check if the user has access to this class
-    let hasAccess = false;
+    // Validate access to class based on user role
+    const hasAccess = await _verifyClassAccess(classId, userId, userRole);
     
-    if (userRole === 'teacher') {
-      const [teacherCheck] = await pool.query(
-        'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
-        [classId, userId]
-      );
-      hasAccess = teacherCheck.length > 0;
-    } else if (userRole === 'student') {
-      const [studentCheck] = await pool.query(
-        'SELECT id FROM class_enrollments WHERE class_id = ? AND student_id = ?',
-        [classId, userId]
-      );
-      hasAccess = studentCheck.length > 0;
-    }
-
     if (!hasAccess) {
       return res.status(403).json({
         error: {
-          message: 'You do not have access to this class',
+          message: 'Access denied: You do not have permission to view topics for this class',
           code: 'ACCESS_DENIED'
         }
       });
     }
 
-    // Get topics with materials and assignments count
-    const [topics] = await pool.query(`
+    // Fetch topics with related counts
+    const topicsQuery = `
       SELECT t.*,
-        (SELECT COUNT(*) FROM materials WHERE topic_id = t.id) as materials_count,
-        (SELECT COUNT(*) FROM assignments WHERE topic_id = t.id) as assignments_count
-      FROM topics t
+        (SELECT COUNT(*) FROM tbl_materials WHERE topic_id = t.id) as materials_count,
+        (SELECT COUNT(*) FROM tbl_assignments WHERE topic_id = t.id) as assignments_count
+      FROM tbl_topics t
       WHERE t.class_id = ?
       ORDER BY t.order_index
-    `, [classId]);
-
+    `;
+    
+    const [topics] = await pool.query(topicsQuery, [classId]);
+    
     res.json(topics);
   } catch (error) {
-    console.error('Error getting topics:', error);
+    console.error('❌ Error fetching topics:', error);
     res.status(500).json({
       error: {
-        message: 'Error retrieving topics',
+        message: 'Server error: Failed to retrieve topics',
         code: 'SERVER_ERROR'
       }
     });
@@ -65,36 +56,19 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
 });
 
 /**
- * @route   POST /api/topics
- * @desc    Create a new topic
- * @access  Private (Teacher only)
+ * Creates a new topic for a class
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
+  const { class_id, name, description = '' } = req.body;
+  const { id: userId, role: userRole } = req.user;
+
   try {
-    const { class_id, name, description } = req.body;
-    const userId = req.user.id;
-
-    // Check if user is a teacher
-    if (req.user.role !== 'teacher') {
+    // Validate teacher role
+    if (userRole !== 'teacher') {
       return res.status(403).json({
         error: {
-          message: 'Only teachers can create topics',
+          message: 'Permission denied: Only teachers can create topics',
           code: 'UNAUTHORIZED_ROLE'
-        }
-      });
-    }
-
-    // Check if the teacher owns this class
-    const [teacherCheck] = await pool.query(
-      'SELECT id FROM classes WHERE id = ? AND teacher_id = ?',
-      [class_id, userId]
-    );
-    
-    if (teacherCheck.length === 0) {
-      return res.status(403).json({
-        error: {
-          message: 'You do not have permission to add topics to this class',
-          code: 'ACCESS_DENIED'
         }
       });
     }
@@ -103,45 +77,96 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!class_id || !name) {
       return res.status(400).json({
         error: {
-          message: 'Class ID and topic name are required',
+          message: 'Missing required fields: class_id and name are required',
           code: 'MISSING_FIELDS'
         }
       });
     }
 
-    // Find the next order index
-    const [maxOrderResult] = await pool.query(
-      'SELECT MAX(order_index) as max_order FROM topics WHERE class_id = ?',
-      [class_id]
-    );
+    // Verify teacher owns this class
+    const ownershipVerified = await _verifyClassOwnership(class_id, userId);
     
-    const nextOrder = (maxOrderResult[0].max_order || 0) + 1;
+    if (!ownershipVerified) {
+      return res.status(403).json({
+        error: {
+          message: 'Permission denied: You are not the teacher of this class',
+          code: 'ACCESS_DENIED'
+        }
+      });
+    }
 
-    // Generate a unique topic ID
-    const topicId = require('crypto').randomUUID();
-
-    // Insert topic into database
+    // Determine next order index
+    const nextOrderIndex = await _getNextTopicOrderIndex(class_id);
+    
+    // Generate unique ID and create topic
+    const topicId = crypto.randomUUID(); // Use crypto instead of uuid
+    
     await pool.query(
-      'INSERT INTO topics (id, class_id, name, description, order_index) VALUES (?, ?, ?, ?, ?)',
-      [topicId, class_id, name, description || '', nextOrder]
+      'INSERT INTO tbl_topics (id, class_id, name, description, order_index) VALUES (?, ?, ?, ?, ?)',
+      [topicId, class_id, name, description, nextOrderIndex]
     );
 
-    // Get the created topic
-    const [newTopic] = await pool.query(
-      'SELECT * FROM topics WHERE id = ?',
+    // Fetch created topic
+    const [topicResult] = await pool.query(
+      'SELECT * FROM tbl_topics WHERE id = ?',
       [topicId]
     );
-
-    res.status(201).json(newTopic[0]);
+    
+    res.status(201).json(topicResult[0]);
   } catch (error) {
-    console.error('Error creating topic:', error);
+    console.error('❌ Error creating topic:', error);
     res.status(500).json({
       error: {
-        message: 'Error creating topic',
+        message: 'Server error: Failed to create topic',
         code: 'SERVER_ERROR'
       }
     });
   }
 });
+
+/**
+ * Verify if user has access to a class
+ * @private
+ */
+async function _verifyClassAccess(classId, userId, role) {
+  if (role === 'teacher') {
+    const [teacherCheck] = await pool.query(
+      'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
+      [classId, userId]
+    );
+    return teacherCheck.length > 0;
+  } else if (role === 'student') {
+    const [studentCheck] = await pool.query(
+      'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
+      [classId, userId]
+    );
+    return studentCheck.length > 0;
+  }
+  return false;
+}
+
+/**
+ * Verify if teacher owns a class
+ * @private
+ */
+async function _verifyClassOwnership(classId, teacherId) {
+  const [result] = await pool.query(
+    'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
+    [classId, teacherId]
+  );
+  return result.length > 0;
+}
+
+/**
+ * Get next order index for topics in a class
+ * @private
+ */
+async function _getNextTopicOrderIndex(classId) {
+  const [result] = await pool.query(
+    'SELECT MAX(order_index) as max_order FROM tbl_topics WHERE class_id = ?',
+    [classId]
+  );
+  return (result[0].max_order || 0) + 1;
+}
 
 module.exports = router;

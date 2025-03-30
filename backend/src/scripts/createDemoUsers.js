@@ -1,53 +1,71 @@
+/**
+ * Demo User Creation Script
+ * Creates example teacher and student accounts for testing
+ */
 
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
-const crypto = require('crypto');
+const crypto = require('crypto'); // Replace uuid with native crypto
 
+/**
+ * Creates demonstration teacher and student accounts 
+ */
 async function createDemoUsers() {
   try {
-    console.log('Connecting to database...');
-    await pool.getConnection();
-    console.log('Connected to database.');
+    console.log('📊 Initializing demo user creation...');
+    
+    // Establish database connection
+    const connection = await pool.getConnection();
+    console.log('✅ Connected to database successfully');
+    
+    // Check for existing demo users
+    const [teacherExists] = await connection.query(
+      'SELECT * FROM tbl_users WHERE email = ?', 
+      ['teacher@example.com']
+    );
+    
+    const [studentExists] = await connection.query(
+      'SELECT * FROM tbl_users WHERE email = ?', 
+      ['student@example.com']
+    );
 
-    // Check if users already exist
-    const [teacherExists] = await pool.query('SELECT * FROM users WHERE email = ?', ['teacher@example.com']);
-    const [studentExists] = await pool.query('SELECT * FROM users WHERE email = ?', ['student@example.com']);
-
-    // Create teacher if doesn't exist
+    // Create teacher account if needed
     if (teacherExists.length === 0) {
-      const teacherId = crypto.randomUUID();
-      const teacherPassword = await bcrypt.hash('password123', 10);
+      const teacherId = crypto.randomUUID(); // Use crypto instead of uuidv4
+      const passwordHash = await bcrypt.hash('password123', 10);
       
-      await pool.query(
-        'INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
-        [teacherId, 'Profesor Demo', 'teacher@example.com', teacherPassword, 'teacher']
+      await connection.query(
+        'INSERT INTO tbl_users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+        [teacherId, 'Profesor Demo', 'teacher@example.com', passwordHash, 'teacher']
       );
-      console.log('Created demo teacher account.');
+      console.log('✅ Created demo teacher account');
     } else {
-      console.log('Demo teacher account already exists.');
+      console.log('ℹ️ Demo teacher account already exists');
     }
 
-    // Create student if doesn't exist
+    // Create student account if needed
     if (studentExists.length === 0) {
-      const studentId = crypto.randomUUID();
-      const studentPassword = await bcrypt.hash('password123', 10);
+      const studentId = crypto.randomUUID(); // Use crypto instead of uuidv4
+      const passwordHash = await bcrypt.hash('password123', 10);
       
-      await pool.query(
-        'INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
-        [studentId, 'Estudiante Demo', 'student@example.com', studentPassword, 'student']
+      await connection.query(
+        'INSERT INTO tbl_users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+        [studentId, 'Estudiante Demo', 'student@example.com', passwordHash, 'student']
       );
-      console.log('Created demo student account.');
+      console.log('✅ Created demo student account');
     } else {
-      console.log('Demo student account already exists.');
+      console.log('ℹ️ Demo student account already exists');
     }
-
-    console.log('Demo users setup complete!');
+    
+    connection.release();
+    console.log('🎉 Demo users setup completed successfully!');
     process.exit(0);
   } catch (error) {
-    console.error('Error creating demo users:', error);
+    console.error('❌ Error creating demo users:', error);
     process.exit(1);
   }
 }
 
+// Execute the function
 createDemoUsers();

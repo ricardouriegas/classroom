@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
@@ -13,7 +12,7 @@ const router = express.Router();
 router.get('/', authMiddleware, async (req, res) => {
   try {
     // Get all careers from database
-    const [careers] = await pool.query('SELECT id, name, description FROM careers ORDER BY name');
+    const [careers] = await pool.query('SELECT id, name, description FROM tbl_careers ORDER BY name');
     
     res.json(careers);
   } catch (error) {
@@ -37,7 +36,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     const careerId = req.params.id;
     
     // Get career by ID
-    const [career] = await pool.query('SELECT id, name, description FROM careers WHERE id = ?', [careerId]);
+    const [career] = await pool.query('SELECT id, name, description FROM tbl_careers WHERE id = ?', [careerId]);
     
     if (career.length === 0) {
       return res.status(404).json({

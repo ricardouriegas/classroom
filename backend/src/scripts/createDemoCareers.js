@@ -1,8 +1,13 @@
+/**
+ * Demo Careers Creation Script
+ * Populates the database with example academic careers
+ */
 
 require('dotenv').config({ path: '../../.env' });
 const { pool } = require('../config/db');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto'); // Replace uuid with native crypto
 
+// Career data to be inserted
 const careers = [
   {
     name: 'Ingeniería en Sistemas Computacionales',
@@ -30,35 +35,38 @@ const careers = [
   }
 ];
 
+/**
+ * Creates demonstration academic careers
+ */
 async function createCareers() {
   try {
-    console.log('Creating demo careers...');
+    console.log('📚 Initializing demo careers creation...');
     
     // Check if careers already exist
-    const [existingCareers] = await pool.query('SELECT COUNT(*) as count FROM careers');
+    const [existingCareers] = await pool.query('SELECT COUNT(*) as count FROM tbl_careers');
     
     if (existingCareers[0].count > 0) {
-      console.log('Careers already exist in the database. Skipping creation.');
+      console.log('ℹ️ Careers already exist in the database. Skipping creation.');
       process.exit(0);
     }
     
-    // Insert careers
+    // Insert each career with a unique ID
     for (const career of careers) {
-      const careerId = uuidv4();
+      const careerId = crypto.randomUUID(); // Use crypto instead of uuidv4
       await pool.query(
-        'INSERT INTO careers (id, name, description) VALUES (?, ?, ?)',
+        'INSERT INTO tbl_careers (id, name, description) VALUES (?, ?, ?)',
         [careerId, career.name, career.description]
       );
-      console.log(`Created career: ${career.name}`);
+      console.log(`✅ Created career: ${career.name}`);
     }
     
-    console.log('Demo careers created successfully!');
+    console.log('🎓 Demo careers created successfully!');
     process.exit(0);
   } catch (error) {
-    console.error('Error creating demo careers:', error);
+    console.error('❌ Error creating demo careers:', error);
     process.exit(1);
   }
 }
 
-// Run the function
+// Execute the function
 createCareers();
