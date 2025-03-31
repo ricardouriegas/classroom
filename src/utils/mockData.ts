@@ -1,4 +1,3 @@
-
 export interface NavItem {
   title: string;
   href: string;
@@ -194,3 +193,23 @@ export interface StudentSubmission {
   grade?: number;
   feedback?: string;
 }
+
+// Mock implementation of student submissions array
+export const mockStudentSubmissions: StudentSubmission[] = [
+  {
+    id: "sub1",
+    assignment_id: "assign1",
+    student_id: "student1",
+    student_name: "Student Name",
+    submission_date: new Date().toISOString(),
+    files: [
+      {
+        id: "file1",
+        fileName: "submission.pdf",
+        fileSize: 1024,
+        fileType: "application/pdf",
+        fileUrl: "/uploads/submission.pdf"
+      }
+    ]
+  }
+];

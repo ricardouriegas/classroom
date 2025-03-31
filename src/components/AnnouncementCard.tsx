@@ -7,13 +7,14 @@ import { File, Image, FileText, Download } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 // Actualizada la interfaz para incluir los attachments explícitamente
-interface Announcement {
+export interface Announcement {
   id: string;
   title: string;
   content: string;
   authorId: string;
   authorName: string;
   authorAvatar?: string;
+  createdAt: string;
   attachments: Array<{
     id: string;
     fileName: string;
@@ -21,8 +22,26 @@ interface Announcement {
     fileType: string;
     fileUrl: string;
   }>;
-  createdAt: string;
 }
+
+export const transformAnnouncement = (data: any): Announcement => {
+  return {
+    id: data.id,
+    title: data.title,
+    content: data.content,
+    authorId: data.author_id, // transformación de snake_case a camelCase
+    authorName: data.author_name,
+    authorAvatar: data.author_avatar,
+    createdAt: new Date(data.created_at).toISOString(), // o data.created_at si ya viene formateado
+    attachments: (data.attachments || []).map((att: any) => ({
+      id: att.id,
+      fileName: att.file_name,
+      fileSize: att.file_size,
+      fileType: att.file_type,
+      fileUrl: att.file_url,
+    }))
+  };
+};
 
 interface AnnouncementCardProps {
   announcement: Announcement;
@@ -40,7 +59,20 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
       .toUpperCase();
   };
   
-  const formattedDate = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
+  // Safe date formatting with error handling
+  const formattedDate = React.useMemo(() => {
+    try {
+      if (!createdAt) return 'Unknown date';
+      // Handle both string and Date objects
+      const date = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
+      // Check if date is valid
+      if (isNaN(date.getTime())) return 'Invalid date';
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Unknown date';
+    }
+  }, [createdAt]);
   
   // Función para formatear el tamaño del archivo
   const formatFileSize = (bytes: number): string => {
@@ -60,22 +92,34 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
     }
   };
 
-  // Función para obtener la URL completa del archivo
+  // Function for obtaining the URL complete of the file with safer handling
   const getFullFileUrl = (fileUrl: string): string => {
-    // Si la URL ya es absoluta (comienza con http:// o https://), devolverla como está
+    if (!fileUrl) return '';
+    
+    // If the URL is already absolute, return it as is
     if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
       return fileUrl;
     }
     
-    // Si es una ruta relativa, combinarla con la URL base de la API
-    // Asegurar que no haya dobles barras
-    const baseUrl = apiBaseUrl?.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+    // If API base URL is not available, return the relative path
+    if (!apiBaseUrl) {
+      console.warn('apiBaseUrl is not defined, returning relative path');
+      return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+    }
+    
+    // Combine API base URL with file path
+    const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
     const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
     return `${baseUrl}${relativePath}`;
   };
 
-  // Función mejorada para manejar la descarga de archivos
+  // Safer download function
   const handleDownload = async (fileUrl: string, fileName: string, fileType: string) => {
+    if (!fileUrl) {
+      console.error('No file URL provided');
+      return;
+    }
+    
     try {
       // Obtener la URL completa del archivo
       const fullUrl = getFullFileUrl(fileUrl);
@@ -134,12 +178,12 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
     <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center gap-4 pb-2">
         <Avatar className="h-10 w-10">
-          <AvatarImage src={authorAvatar} alt={authorName} />
-          <AvatarFallback>{getInitials(authorName)}</AvatarFallback>
+          <AvatarImage src={authorAvatar} alt={authorName || 'Author'} />
+          <AvatarFallback>{authorName ? getInitials(authorName) : 'UN'}</AvatarFallback>
         </Avatar>
         
         <div className="flex flex-col">
-          <div className="font-medium">{authorName}</div>
+          <div className="font-medium">{authorName || 'Unknown author'}</div>
           <div className="text-xs text-gray-500">{formattedDate}</div>
         </div>
       </CardHeader>
@@ -148,37 +192,44 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
         <h3 className="text-lg font-medium mb-2">{title}</h3>
         <p className="text-gray-600 whitespace-pre-line mb-4">{content}</p>
         
-        {/* Renderizar los archivos adjuntos */}
-        {attachments && attachments.length > 0 && (
+        {/* Render attachments with better error handling */}
+        {Array.isArray(attachments) && attachments.length > 0 && (
           <div className="mt-4 space-y-2">
             <h4 className="text-sm font-medium text-gray-700">Archivos adjuntos:</h4>
             <div className="space-y-2">
               {attachments.map((attachment) => (
-                <div 
-                  key={attachment.id} 
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
-                >
-                  <div className="flex items-center space-x-2">
-                    {getFileIcon(attachment.fileType)}
-                    <div>
-                      <p className="text-sm font-medium truncate max-w-[200px]">
-                        {attachment.fileName}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFileSize(attachment.fileSize)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 ml-2"
-                    onClick={() => handleDownload(attachment.fileUrl, attachment.fileName, attachment.fileType)}
+                attachment && attachment.id ? (
+                  <div 
+                    key={attachment.id} 
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
                   >
-                    <Download className="h-4 w-4" />
-                    <span className="sr-only">Descargar</span>
-                  </Button>
-                </div>
+                    <div className="flex items-center space-x-2">
+                      {getFileIcon(attachment.fileType || 'unknown')}
+                      <div>
+                        <p className="text-sm font-medium truncate max-w-[200px]">
+                          {attachment.fileName || 'Unnamed file'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(attachment.fileSize || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 ml-2"
+                      onClick={() => handleDownload(
+                        attachment.fileUrl || '', 
+                        attachment.fileName || 'download', 
+                        attachment.fileType || 'application/octet-stream'
+                      )}
+                      disabled={!attachment.fileUrl}
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="sr-only">Descargar</span>
+                    </Button>
+                  </div>
+                ) : null
               ))}
             </div>
           </div>
