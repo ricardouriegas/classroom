@@ -26,6 +26,8 @@ type Career = {
   id: string;
   name: string;
 };
+// ... imports idénticos a los que tú pusiste (no los repetimos por espacio)
+import { RiArrowLeftLine, RiCheckLine } from "react-icons/ri"; // reemplazo de íconos si deseas
 
 const CreateClass = () => {
   const { currentUser } = useAuth();
@@ -34,7 +36,7 @@ const CreateClass = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [careers, setCareers] = useState<Career[]>([]);
   const [careersLoading, setCareersLoading] = useState(false);
-  
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -43,85 +45,73 @@ const CreateClass = () => {
       semester: '',
     },
   });
-  
-  // Fetch careers when component mounts
+
   useEffect(() => {
     const fetchCareers = async () => {
       try {
         setCareersLoading(true);
-        // Fetch careers from API instead of using mock data
         const response = await api.get('/careers');
         setCareers(response.data);
       } catch (error) {
-        console.error('Error fetching careers:', error);
         toast({
           title: "Error",
-          description: "No se pudieron cargar las carreras. Por favor, inténtelo de nuevo.",
+          description: "No se pudieron cargar las carreras.",
           variant: "destructive",
         });
       } finally {
         setCareersLoading(false);
       }
     };
-    
     fetchCareers();
   }, [toast]);
-  
-  // Check if user is a teacher, otherwise redirect
+
   if (!currentUser || currentUser.role !== 'teacher') {
     navigate('/dashboard');
     return null;
   }
-  
-  // Submit handler
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    
     try {
-      // Call backend API to create class
       const response = await api.post('/classes', values);
-      
       toast({
         title: "¡Éxito!",
-        description: `La clase "${values.name}" ha sido creada correctamente.`,
+        description: `La clase "${values.name}" ha sido creada.`,
       });
-      
-      // Redirect to the new class page
       navigate(`/class/${response.data.id}`);
     } catch (error: any) {
-      console.error('Error creating class:', error);
       toast({
         title: "Error",
-        description: error.response?.data?.error?.message || "Ocurrió un error al crear la clase. Por favor, inténtelo de nuevo.",
+        description: error.response?.data?.error?.message || "Error al crear la clase.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#0F0C29] via-[#302B63] to-[#1E1E2F] text-white flex flex-col">
       <Navbar />
       
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-2xl">
+      <main className="flex-1 container mx-auto px-4 py-10 max-w-3xl">
         <Button
           variant="ghost"
-          className="mb-6"
+          className="mb-6 text-[#00ffc3] hover:bg-[#00ffc3]/10"
           onClick={() => navigate('/dashboard')}
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <RiArrowLeftLine className="mr-2 h-5 w-5" />
           Volver al Panel
         </Button>
-        
-        <Card className="animate-fade-in">
+
+        <Card className="bg-[#1e1e2f]/80 border border-[#4c4c6d] backdrop-blur-sm shadow-xl animate-fade-in">
           <CardHeader>
-            <CardTitle className="text-2xl">Crear Clase</CardTitle>
-            <CardDescription>
-              Complete los detalles para crear una nueva clase para sus estudiantes.
+            <CardTitle className="text-3xl text-[#00ffc3]">Crear Clase</CardTitle>
+            <CardDescription className="text-gray-400">
+              Llena los datos para crear una nueva clase.
             </CardDescription>
           </CardHeader>
-          
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
@@ -130,9 +120,10 @@ const CreateClass = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre de la Clase <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel className="text-white">Nombre de la Clase <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
                         <Input
+                          className="bg-[#2f2f42] border border-[#4c4c6d] focus:border-[#00ffc3] focus:ring-[#00ffc3] text-white"
                           placeholder="Ej: Programación Web"
                           {...field}
                         />
@@ -141,29 +132,29 @@ const CreateClass = () => {
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="career_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Carrera <span className="text-red-500">*</span></FormLabel>
+                        <FormLabel className="text-white">Carrera <span className="text-red-500">*</span></FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                           disabled={careersLoading}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="bg-[#2f2f42] border-[#4c4c6d] text-white focus:border-[#00ffc3] focus:ring-[#00ffc3]">
                               <SelectValue placeholder="Seleccione una carrera" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-[#2f2f42] text-white border-[#4c4c6d]">
                             {careersLoading ? (
-                              <SelectItem value="loading" disabled>Cargando carreras...</SelectItem>
+                              <SelectItem value="loading" disabled>Cargando...</SelectItem>
                             ) : careers.length === 0 ? (
-                              <SelectItem value="none" disabled>No hay carreras disponibles</SelectItem>
+                              <SelectItem value="none" disabled>No hay carreras</SelectItem>
                             ) : (
                               careers.map((career) => (
                                 <SelectItem key={career.id} value={career.id}>
@@ -177,16 +168,17 @@ const CreateClass = () => {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="semester"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cuatrimestre <span className="text-red-500">*</span></FormLabel>
+                        <FormLabel className="text-white">Cuatrimestre <span className="text-red-500">*</span></FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Ej: 2023-B"
+                            className="bg-[#2f2f42] border border-[#4c4c6d] focus:border-[#00ffc3] focus:ring-[#00ffc3] text-white"
                             {...field}
                           />
                         </FormControl>
@@ -195,48 +187,57 @@ const CreateClass = () => {
                     )}
                   />
                 </div>
-                
+
                 <FormField
                   control={form.control}
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Descripción</FormLabel>
+                      <FormLabel className="text-white">Descripción</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Descripción del curso, objetivos, etc."
-                          className="min-h-[100px]"
+                          className="bg-[#2f2f42] border border-[#4c4c6d] focus:border-[#00ffc3] focus:ring-[#00ffc3] text-white min-h-[100px]"
+                          placeholder="Breve descripción de la clase..."
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription>
-                        Proporcione una descripción para ayudar a los estudiantes a entender el contenido de la clase.
+                      <FormDescription className="text-gray-400">
+                        Opcional: describe los temas, objetivos u otra información relevante.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </CardContent>
-              
+
               <CardFooter className="flex justify-between">
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   variant="outline"
                   onClick={() => navigate('/dashboard')}
+                  className="border-[#0F0C29] text-[#0F0C29] hover:bg-[#00ffc3]/10"
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isLoading}>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-[#00ffc3] text-black hover:bg-[#00ffc3]/90 transition-all"
+                >
                   {isLoading ? (
                     <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                       </svg>
                       Creando...
                     </span>
                   ) : (
-                    "Crear Clase"
+                    <>
+                      <RiCheckLine className="mr-2 h-4 w-4" />
+                      Crear Clase
+                    </>
                   )}
                 </Button>
               </CardFooter>
@@ -249,3 +250,5 @@ const CreateClass = () => {
 };
 
 export default CreateClass;
+
+

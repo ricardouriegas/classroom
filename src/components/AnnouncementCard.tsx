@@ -6,23 +6,21 @@ import { Button } from '@/components/ui/button';
 import { File, Image, FileText, Download } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-// Updated interface to match the backend response structure
-interface Attachment {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  fileType: string;
-  fileUrl: string;
-}
-
+// Actualizada la interfaz para incluir los attachments explícitamente
 interface Announcement {
   id: string;
   title: string;
   content: string;
-  authorId?: string; // Make optional
-  authorName?: string; // Make optional
+  authorId: string;
+  authorName: string;
   authorAvatar?: string;
-  attachments?: Attachment[]; // Make optional with proper type
+  attachments: Array<{
+    id: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    fileUrl: string;
+  }>;
   createdAt: string;
 }
 
@@ -31,43 +29,28 @@ interface AnnouncementCardProps {
 }
 
 const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => {
-  // Add default values and safeguards with optional chaining
-  const { 
-    title = "Untitled Announcement", 
-    content = "", 
-    authorName = "Unknown", 
-    authorAvatar, 
-    createdAt, 
-    attachments = [] // Default to empty array if undefined
-  } = announcement || {};
-  
+  const { title, content, authorName, authorAvatar, createdAt, attachments = [] } = announcement;
   const { apiBaseUrl } = useAuth();
-  
-  // Handle case where createdAt might be missing or invalid
-  const formattedDate = createdAt ? 
-    formatDistanceToNow(new Date(createdAt), { addSuffix: true }) : 
-    'recently';
   
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(part => part[0] || '')
+      .map(part => part[0])
       .join('')
       .toUpperCase();
   };
   
-  // Format file size with safeguards
+  const formattedDate = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
+  
+  // Función para formatear el tamaño del archivo
   const formatFileSize = (bytes: number): string => {
-    if (!bytes && bytes !== 0) return '0 B';
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  // Get file icon with type safety
-  const getFileIcon = (fileType: string | undefined) => {
-    if (!fileType) return <File className="h-5 w-5 text-gray-500" />;
-    
+  // Función para obtener el icono adecuado según el tipo de archivo
+  const getFileIcon = (fileType: string) => {
     if (fileType.startsWith('image/')) {
       return <Image className="h-5 w-5 text-blue-500" />;
     } else if (fileType === 'application/pdf') {
@@ -77,47 +60,38 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
     }
   };
 
-  // Handle URL construction with checks
-  const getFullFileUrl = (fileUrl: string | undefined): string => {
-    if (!fileUrl) return '';
-    
-    // If the URL already is absolute, return as is
+  // Función para obtener la URL completa del archivo
+  const getFullFileUrl = (fileUrl: string): string => {
+    // Si la URL ya es absoluta (comienza con http:// o https://), devolverla como está
     if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
       return fileUrl;
     }
     
-    // Make sure apiBaseUrl exists before trying to use it
-    if (!apiBaseUrl) return fileUrl;
-    
-    // Combine base URL and file path safely
-    const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+    // Si es una ruta relativa, combinarla con la URL base de la API
+    // Asegurar que no haya dobles barras
+    const baseUrl = apiBaseUrl?.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
     const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
     return `${baseUrl}${relativePath}`;
   };
 
-  // Improved file download with error handling
-  const handleDownload = async (fileUrl: string | undefined, fileName: string | undefined, fileType: string | undefined) => {
-    if (!fileUrl || !fileName) {
-      console.error('Missing file information for download');
-      return;
-    }
-    
+  // Función mejorada para manejar la descarga de archivos
+  const handleDownload = async (fileUrl: string, fileName: string, fileType: string) => {
     try {
-      // Get the full URL of the file
+      // Obtener la URL completa del archivo
       const fullUrl = getFullFileUrl(fileUrl);
       
-      // For images and PDFs, open in new tab
-      if (fileType?.startsWith('image/') || fileType === 'application/pdf') {
+      // Opción 1: Abrir el archivo en una nueva pestaña del navegador
+      if (fileType.startsWith('image/') || fileType === 'application/pdf') {
         window.open(fullUrl, '_blank');
         return;
       }
       
-      console.log('Downloading file from:', fullUrl);
+      console.log('Descargando archivo desde:', fullUrl);
       
-      // For other file types, handle download
+      // Opción 2: Para otros tipos de archivos, intentar descarga directa
       const response = await fetch(fullUrl, {
         method: 'GET',
-        credentials: 'include',
+        credentials: 'include', // Incluir cookies para autenticación si es necesario
         headers: {
           'Content-Type': 'application/octet-stream',
         },
@@ -128,26 +102,31 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
+      // Obtener el archivo como arrayBuffer en lugar de blob para mejor manejo binario
       const arrayBuffer = await response.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: fileType || 'application/octet-stream' });
       
+      // Crear un objeto URL para el blob
       const url = window.URL.createObjectURL(blob);
       
+      // Crear un enlace temporal para la descarga
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', fileName);
       link.style.display = 'none';
       
+      // Añadir el enlace al documento, hacer clic en él y luego eliminarlo
       document.body.appendChild(link);
       link.click();
       
+      // Dar tiempo al navegador para iniciar la descarga
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }, 100);
     } catch (error) {
-      console.error('Error downloading file:', error);
-      alert(`Failed to download: ${fileName}. ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error al descargar el archivo:', error);
+      alert(`No se pudo descargar el archivo: ${fileName}. Detalles: ${error.message}`);
     }
   };
   
@@ -169,7 +148,7 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => 
         <h3 className="text-lg font-medium mb-2">{title}</h3>
         <p className="text-gray-600 whitespace-pre-line mb-4">{content}</p>
         
-        {/* Only render attachments section if there are attachments */}
+        {/* Renderizar los archivos adjuntos */}
         {attachments && attachments.length > 0 && (
           <div className="mt-4 space-y-2">
             <h4 className="text-sm font-medium text-gray-700">Archivos adjuntos:</h4>

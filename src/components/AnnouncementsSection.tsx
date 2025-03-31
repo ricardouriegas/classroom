@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -9,7 +8,6 @@ import { FileText, Plus } from 'lucide-react';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import AnnouncementForm from '@/components/AnnouncementForm';
 
-// Define the announcement type
 interface Announcement {
   id: string;
   title: string;
@@ -40,23 +38,20 @@ const AnnouncementsSection = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       if (!classId) return;
-      
       try {
         setIsLoading(true);
         const response = await api.get(`/announcements/class/${classId}`);
         setAnnouncements(response.data);
       } catch (error) {
-        console.error('Error fetching announcements:', error);
         toast({
           title: 'Error',
-          description: 'No se pudieron cargar los anuncios. Por favor, inténtelo de nuevo.',
+          description: 'No se pudieron cargar los anuncios.',
           variant: 'destructive',
         });
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchAnnouncements();
   }, [classId, toast]);
 
@@ -65,7 +60,7 @@ const AnnouncementsSection = () => {
     setShowForm(false);
     toast({
       title: 'Éxito',
-      description: 'El anuncio se ha creado correctamente.',
+      description: 'El anuncio fue creado correctamente.',
     });
   };
 
@@ -79,11 +74,29 @@ const AnnouncementsSection = () => {
 
   return (
     <div className="space-y-6">
+      {/* Mostrar formulario primero */}
+      {showForm && isTeacher && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Nuevo Anuncio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AnnouncementForm
+              classId={classId!}
+              onAnnouncementCreated={handleAnnouncementCreated}
+              onCancel={() => setShowForm(false)}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Botón de crear anuncio */}
       {isTeacher && (
-        <div className="flex justify-end">
-          <Button 
-            onClick={() => setShowForm(!showForm)} 
+        <div className="flex justify-start">
+          <Button
+            onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-1"
+            variant={showForm ? 'outline' : 'default'}
           >
             {showForm ? 'Cancelar' : (
               <>
@@ -95,21 +108,7 @@ const AnnouncementsSection = () => {
         </div>
       )}
 
-      {showForm && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Crear Nuevo Anuncio</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AnnouncementForm 
-              classId={classId!} 
-              onAnnouncementCreated={handleAnnouncementCreated} 
-              onCancel={() => setShowForm(false)}
-            />
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Lista de anuncios */}
       {announcements.length > 0 ? (
         <div className="space-y-4">
           {announcements.map((announcement) => (
@@ -122,15 +121,12 @@ const AnnouncementsSection = () => {
             <FileText className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-xl font-medium text-gray-700 mb-2">No hay anuncios</h3>
             <p className="text-gray-500 max-w-md">
-              {isTeacher 
-                ? 'No has creado ningún anuncio para esta clase. ¡Crea el primero!'
-                : 'No hay anuncios disponibles para esta clase.'}
+              {isTeacher
+                ? 'Aún no has publicado ningún anuncio. ¡Comienza con el primero!'
+                : 'Todavía no hay anuncios disponibles para esta clase.'}
             </p>
-            {isTeacher && (
-              <Button 
-                onClick={() => setShowForm(true)} 
-                className="mt-4"
-              >
+            {isTeacher && !showForm && (
+              <Button onClick={() => setShowForm(true)} className="mt-4">
                 Crear Primer Anuncio
               </Button>
             )}

@@ -1,14 +1,19 @@
-
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, CheckCircle, Clock, FileText, XCircle } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
-// Mock data for the assignments page
+import { 
+  Calendar, 
+  CheckCircle, 
+  Clock, 
+  FileText 
+} from 'lucide-react';
+
+// Mock data
 const mockClasses = [
   { id: 'class1', name: 'Programming 101' },
   { id: 'class2', name: 'Web Development' },
@@ -23,7 +28,7 @@ const mockAssignments = [
     className: 'Programming 101',
     dueDate: new Date(2023, 5, 20), 
     status: 'pending',
-    description: 'Learn about variables and their types in programming'
+    description: 'Learn about variables and their types in programming',
   },
   { 
     id: 'a2', 
@@ -32,7 +37,7 @@ const mockAssignments = [
     className: 'Web Development',
     dueDate: new Date(2023, 5, 18), 
     status: 'pending',
-    description: 'Create a database schema for a social media application'
+    description: 'Create a database schema for a social media application',
   },
   { 
     id: 'a3', 
@@ -51,29 +56,29 @@ const mockAssignments = [
     className: 'Data Structures',
     dueDate: new Date(2023, 5, 10), 
     status: 'late',
-    description: 'Implement a doubly linked list with all operations'
+    description: 'Implement a doubly linked list with all operations',
   },
 ];
 
 const Assignments = () => {
   const { currentUser, isLoading } = useAuth();
-
-  // Filter assignments based on status
+  
+  // Filtrar assignments
   const pendingAssignments = mockAssignments.filter(a => a.status === 'pending');
   const completedAssignments = mockAssignments.filter(a => a.status === 'completed');
   const lateAssignments = mockAssignments.filter(a => a.status === 'late');
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-[#0F0C29] via-[#302B63] to-[#1E1E2F] text-white">
         <Navbar />
-        <div className="container mx-auto py-8 px-4">
-          <Skeleton className="h-10 w-64 mb-4" />
-          <Skeleton className="h-6 w-48 mb-8" />
+        <div className="container mx-auto py-10 px-4">
+          <Skeleton className="h-10 w-64 mb-4 bg-[#2f2f42]" />
+          <Skeleton className="h-6 w-48 mb-8 bg-[#2f2f42]" />
           
           <div className="grid grid-cols-1 gap-6">
-            <Skeleton className="h-64 rounded-lg" />
-            <Skeleton className="h-64 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg bg-[#2f2f42]" />
+            <Skeleton className="h-64 rounded-lg bg-[#2f2f42]" />
           </div>
         </div>
       </div>
@@ -81,148 +86,211 @@ const Assignments = () => {
   }
 
   if (!currentUser) {
-    return null; // User is not authenticated, they'll be redirected by the protected route
+    return null; // protected route se encarga de redirigir si no hay user
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#0F0C29] via-[#302B63] to-[#1E1E2F] text-white">
       <Navbar />
-      <div className="container mx-auto py-8 px-4">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Assignments</h1>
-          <p className="text-gray-600 mt-1">View and manage your assignments across all classes</p>
+      
+      <div className="container mx-auto py-10 px-4">
+        <header className="mb-10 text-center">
+          <h1 className="text-4xl font-extrabold tracking-wide text-[#00ffc3]">
+            Asignaciones
+          </h1>
+          <p className="text-gray-200 mt-2">
+            Explora y gestiona tus tareas en cada clase
+          </p>
         </header>
 
-        <Tabs defaultValue="pending" className="space-y-8">
-          <TabsList>
-            <TabsTrigger value="pending">
-              Pending ({pendingAssignments.length})
+        {/* Vertical Tabs Layout */}
+        <Tabs orientation="vertical" defaultValue="pending" className="flex flex-col md:flex-row gap-8">
+          {/* TabsList a la izquierda */}
+          <TabsList
+            className="
+              md:flex md:flex-col md:items-start
+              bg-[#1E1E2F]/80 border border-[#4c4c6d] 
+              w-full md:w-48 space-y-2 p-2 rounded
+            "
+          >
+            <TabsTrigger
+              value="pending"
+              className="data-[state=active]:bg-[#00ffc3]/10 data-[state=active]:text-[#00ffc3] w-full text-left"
+            >
+              Pendientes ({pendingAssignments.length})
             </TabsTrigger>
-            <TabsTrigger value="completed">
-              Completed ({completedAssignments.length})
+            <TabsTrigger
+              value="completed"
+              className="data-[state=active]:bg-[#00ffc3]/10 data-[state=active]:text-[#00ffc3] w-full text-left"
+            >
+              Completadas ({completedAssignments.length})
             </TabsTrigger>
-            <TabsTrigger value="late">
-              Late ({lateAssignments.length})
+            <TabsTrigger
+              value="late"
+              className="data-[state=active]:bg-[#00ffc3]/10 data-[state=active]:text-[#00ffc3] w-full text-left"
+            >
+              Atrasadas ({lateAssignments.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-6">
-            {pendingAssignments.length > 0 ? (
-              pendingAssignments.map(assignment => (
-                <Card key={assignment.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{assignment.title}</CardTitle>
-                        <CardDescription>{assignment.className}</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {assignment.dueDate.toLocaleDateString()}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">
-                      {assignment.description}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-end gap-2">
-                    <Button variant="outline">View Details</Button>
-                    <Button>Submit Assignment</Button>
-                  </CardFooter>
-                </Card>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                  <h3 className="text-xl font-medium text-gray-700 mb-2">No pending assignments!</h3>
-                  <p className="text-gray-500">You're all caught up. Check back later for new assignments.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="completed" className="space-y-6">
-            {completedAssignments.length > 0 ? (
-              completedAssignments.map(assignment => (
-                <Card key={assignment.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{assignment.title}</CardTitle>
-                        <CardDescription>{assignment.className}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                          Grade: {assignment.grade}/100
+          {/* Contenido a la derecha */}
+          <div className="flex-1">
+            <TabsContent value="pending" className="space-y-6">
+              {pendingAssignments.length > 0 ? (
+                pendingAssignments.map((assignment) => (
+                  <Card key={assignment.id} className="bg-[#1E1E2F]/80 border border-gray-700 text-gray-200">
+                    <CardHeader className="pb-2 border-b border-[#4c4c6d]">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg text-[#00ffc3]">
+                            {assignment.title}
+                          </CardTitle>
+                          <CardDescription>
+                            {assignment.className}
+                          </CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="flex items-center gap-1 border-[#00ffc3] text-[#00ffc3] hover:bg-[#00ffc3]/10"
+                        >
+                          <Clock className="h-3 w-3" />
                           {assignment.dueDate.toLocaleDateString()}
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">
-                      {assignment.description}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-end">
-                    <Button variant="outline">View Details</Button>
-                  </CardFooter>
-                </Card>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-xl font-medium text-gray-700 mb-2">No completed assignments</h3>
-                  <p className="text-gray-500">You haven't completed any assignments yet.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="late" className="space-y-6">
-            {lateAssignments.length > 0 ? (
-              lateAssignments.map(assignment => (
-                <Card key={assignment.id} className="border-red-200">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{assignment.title}</CardTitle>
-                        <CardDescription>{assignment.className}</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" className="flex items-center gap-1 text-red-500 border-red-200">
-                        <Clock className="h-3 w-3" />
-                        Due: {assignment.dueDate.toLocaleDateString()}
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-300">
+                        {assignment.description}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 border-t border-[#4c4c6d]">
+                      <Button variant="outline" className="border-[#00ffc3] text-[#00ffc3] hover:bg-[#00ffc3]/10">
+                        Ver Detalles
                       </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">
-                      {assignment.description}
+                      <Button className="bg-[#00ffc3] text-black hover:bg-[#00ffc3]/90">
+                        Entregar
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                <Card className="bg-[#1E1E2F]/80 border border-gray-700 text-gray-300">
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <CheckCircle className="h-12 w-12 text-green-400 mb-4" />
+                    <h3 className="text-xl font-medium text-gray-200 mb-2">¡No hay tareas pendientes!</h3>
+                    <p className="text-gray-400 text-center">
+                      Has completado todas tus tareas o aún no te han asignado nuevas.
                     </p>
                   </CardContent>
-                  <CardFooter className="flex justify-end gap-2">
-                    <Button variant="outline">View Details</Button>
-                    <Button variant="destructive">Submit Late</Button>
-                  </CardFooter>
                 </Card>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                  <h3 className="text-xl font-medium text-gray-700 mb-2">No late assignments!</h3>
-                  <p className="text-gray-500">Good job keeping up with your assignments.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
+              )}
+            </TabsContent>
+
+            <TabsContent value="completed" className="space-y-6">
+              {completedAssignments.length > 0 ? (
+                completedAssignments.map((assignment) => (
+                  <Card key={assignment.id} className="bg-[#1E1E2F]/80 border border-gray-700 text-gray-200">
+                    <CardHeader className="pb-2 border-b border-[#4c4c6d]">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg text-[#00ffc3]">
+                            {assignment.title}
+                          </CardTitle>
+                          <CardDescription>
+                            {assignment.className}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="bg-green-200/20 text-green-300 text-xs font-medium px-2.5 py-0.5 rounded">
+                            Calificación: {assignment.grade}/100
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1 border-[#00ffc3] text-[#00ffc3] hover:bg-[#00ffc3]/10"
+                          >
+                            <Calendar className="h-3 w-3" />
+                            {assignment.dueDate.toLocaleDateString()}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-300">
+                        {assignment.description}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-end border-t border-[#4c4c6d]">
+                      <Button variant="outline" className="border-[#00ffc3] text-[#00ffc3] hover:bg-[#00ffc3]/10">
+                        Ver Detalles
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                <Card className="bg-[#1E1E2F]/80 border border-gray-700 text-gray-300">
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <FileText className="h-12 w-12 text-gray-500 mb-4" />
+                    <h3 className="text-xl font-medium text-gray-200 mb-2">Sin tareas completadas</h3>
+                    <p className="text-gray-400">
+                      Aún no has completado ninguna tarea.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="late" className="space-y-6">
+              {lateAssignments.length > 0 ? (
+                lateAssignments.map((assignment) => (
+                  <Card key={assignment.id} className="bg-[#1E1E2F]/80 border border-red-400 text-gray-200">
+                    <CardHeader className="pb-2 border-b border-red-400">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg text-red-400">
+                            {assignment.title}
+                          </CardTitle>
+                          <CardDescription>
+                            {assignment.className}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1 border-red-400 text-red-400 hover:bg-red-400/10"
+                        >
+                          <Clock className="h-3 w-3" />
+                          Venció: {assignment.dueDate.toLocaleDateString()}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-300">
+                        {assignment.description}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 border-t border-red-400">
+                      <Button variant="outline" className="border-red-400 text-red-400 hover:bg-red-400/10">
+                        Ver Detalles
+                      </Button>
+                      <Button variant="destructive" className="hover:bg-red-600">
+                        Entregar Atrasada
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                <Card className="bg-[#1E1E2F]/80 border border-gray-700 text-gray-300">
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <CheckCircle className="h-12 w-12 text-green-400 mb-4" />
+                    <h3 className="text-xl font-medium text-gray-200 mb-2">¡No hay tareas atrasadas!</h3>
+                    <p className="text-gray-400">Felicidades, te has mantenido al día.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
     </div>

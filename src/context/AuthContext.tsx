@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     setCurrentUser,
-    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000'
   };
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
