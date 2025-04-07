@@ -1,46 +1,67 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config();
+const { pool } = require('./config/db'); // Make sure to import pool from db.js
 
-const { pool } = require('./config/db');
+// Import routes
+const authRoutes = require('./routes/auth.routes');
+const classesRoutes = require('./routes/classes.routes');
+const careersRoutes = require('./routes/careers.routes');
+const topicsRoutes = require('./routes/topics.routes');
+const materialsRoutes = require('./routes/materials.routes');
+const assignmentsRoutes = require('./routes/assignments.routes');
+const announcementsRoutes = require('./routes/announcements.routes');
+const enrollmentsRoutes = require('./routes/enrollments.routes');
 
-const auth_routes = require('./routes/auth.routes');
-const class_routes = require('./routes/classes.routes');
-const enrollment_routes = require('./routes/enrollments.routes');
-const career_routes = require('./routes/careers.routes');
-const topic_routes = require('./routes/topics.routes');
-const announcement_routes = require('./routes/announcements.routes');
-
-const application = express();
-const PORT_NUMBER = process.env.PORT || 3000;
-
-application.use(cors());
-application.use(express.json());
-application.use(express.urlencoded({ extended: true }));
-
-application.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-(async function testDatabaseConnection() {
+// Test database connection
+async function testDatabaseConnection() {
   try {
-    const connection = await pool.getConnection();
-    console.log('✅ Database connection established successfully');
-    connection.release();
-  } catch (err) {
-    console.error('❌ Database connection error:', err);
+    console.log('Testing database connection...');
+    await pool.query('SELECT 1');
+    console.log('✅ Database connection successful');
+  } catch (error) {
+    console.error('❌ Database connection error:', error);
   }
-})();
+}
 
-application.use('/api/auth', auth_routes);
-application.use('/api/classes', class_routes);
-application.use('/api/enrollments', enrollment_routes);
-application.use('/api/careers', career_routes);
-application.use('/api/topics', topic_routes);
-application.use('/api/announcements', announcement_routes);
+// Call test function
+testDatabaseConnection();
 
-application.get('/', (_, res) => {
-  res.json({ status: 'online', message: 'API is running' });
+const app = express();
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/classes', classesRoutes);
+app.use('/api/careers', careersRoutes);
+app.use('/api/topics', topicsRoutes);
+app.use('/api/materials', materialsRoutes);
+app.use('/api/assignments', assignmentsRoutes);
+app.use('/api/announcements', announcementsRoutes);
+app.use('/api/enrollments', enrollmentsRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: {
+      message: 'Internal server error',
+      code: 'SERVER_ERROR',
+    },
+  });
 });
 
-application.listen(PORT_NUMBER, () => {
-  console.log(`⚡️ Server running on http://localhost:${PORT_NUMBER}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = app;

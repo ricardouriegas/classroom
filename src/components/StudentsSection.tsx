@@ -210,7 +210,7 @@ const StudentsSection: React.FC<StudentsSection2Props> = ({ classId, isTeacher }
               {enrolledStudents.map((student) => (
                 <div
                   key={student.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-100"
+                  className="flex items-center justify-between p-3rounded-md border border-gray-100"
                 >
                   <div className="flex items-center gap-3">
                     <Avatar>
@@ -282,7 +282,7 @@ const StudentsSection: React.FC<StudentsSection2Props> = ({ classId, isTeacher }
                 {searchResults.map((student) => (
                   <div
                     key={student.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                    className="flex items-center justify-between p-3 rounded-md"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar>

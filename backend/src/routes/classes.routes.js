@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
-const crypto = require('crypto'); // Native crypto module as fallback
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -60,8 +60,6 @@ router.post('/', authMiddleware, async (req, res) => {
     const { name, description, career_id, semester } = req.body;
     const teacherId = req.user.id;
     
-    console.log('Attempting to create class with teacher ID:', teacherId);
-    
     // Check if user is a teacher
     if (req.user.role !== 'teacher') {
       return res.status(403).json({
@@ -89,7 +87,6 @@ router.post('/', authMiddleware, async (req, res) => {
     );
     
     if (teacherExists.length === 0) {
-      console.error(`Teacher with ID ${teacherId} not found in the database`);
       return res.status(404).json({
         error: {
           message: 'Teacher not found. Your user ID may not exist in the database.',
@@ -99,7 +96,6 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Generate a unique class ID and class code
-    // Using crypto.randomUUID() instead of the uuid package (added in Node.js 14.17.0+)
     const classId = crypto.randomUUID();
     const classCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 

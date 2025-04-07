@@ -7,6 +7,11 @@ const path = require('path');
 
 const router = express.Router();
 
+/**
+ * @route   POST /api/announcements
+ * @desc    Create a new announcement with optional attachments
+ * @access  Private (Teachers only)
+ */
 router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res) => {
   try {
     const { class_id, title, content } = req.body;
@@ -59,11 +64,11 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
       const attachments = [];
       for (const file of files) {
         const attachmentId = crypto.randomUUID();
-        const fileUrl = getFileUrl(file.filename);
+        const filePath = getFileUrl(file.filename);
         
         await connection.query(
           'INSERT INTO tbl_announcement_attachments (id, announcement_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
-          [attachmentId, announcementId, file.originalname, file.size, file.mimetype, fileUrl]
+          [attachmentId, announcementId, file.originalname, file.size, file.mimetype, filePath]
         );
         
         attachments.push({
@@ -71,7 +76,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
           fileName: file.originalname,
           fileSize: file.size,
           fileType: file.mimetype,
-          fileUrl: fileUrl
+          fileUrl: filePath
         });
       }
 
@@ -112,12 +117,18 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
   }
 });
 
+/**
+ * @route   GET /api/announcements/class/:classId
+ * @desc    Get all announcements for a class
+ * @access  Private (Class members only)
+ */
 router.get('/class/:classId', authMiddleware, async (req, res) => {
   try {
     const { classId } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
 
+    // Check if the user has access to this class
     let hasAccess = false;
     
     if (userRole === 'teacher') {
@@ -143,9 +154,17 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
       });
     }
 
-    const query = "SELECT * FROM tbl_announcements WHERE class_id = ?";
-    const [announcements] = await pool.query(query, [classId]);
+    // Get all announcements for the class with author information
+    const [announcements] = await pool.query(`
+      SELECT a.id, a.title, a.content, a.created_at,
+             u.id as author_id, u.name as author_name, u.avatar_url as author_avatar
+      FROM tbl_announcements a
+      JOIN tbl_users u ON a.teacher_id = u.id
+      WHERE a.class_id = ?
+      ORDER BY a.created_at DESC
+    `, [classId]);
 
+    // Get attachments for each announcement
     const formattedAnnouncements = [];
     for (const announcement of announcements) {
       const [attachments] = await pool.query(`
@@ -154,6 +173,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
         WHERE announcement_id = ?
       `, [announcement.id]);
 
+      // Format attachments - map file_url directly
       const formattedAttachments = attachments.map(attachment => ({
         id: attachment.id,
         fileName: attachment.file_name,
@@ -162,6 +182,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
         fileUrl: attachment.file_url
       }));
 
+      // Format announcement
       formattedAnnouncements.push({
         id: announcement.id,
         title: announcement.title,

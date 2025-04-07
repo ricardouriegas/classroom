@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
@@ -194,7 +193,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="title" className="text-sm font-medium text-gray-700">
+        <Label htmlFor="title" className="text-sm font-medium text-gray-200">
           Título
         </Label>
         <Input
@@ -203,12 +202,12 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={isSubmitting}
-          className="w-full"
+          className="w-full bg-[#252538] border-[#4c4c6d] text-white placeholder:text-gray-500 focus:border-[#00ffc3] focus:ring-[#00ffc3]"
         />
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="content" className="block text-sm font-medium text-gray-700">
+        <Label htmlFor="content" className="block text-sm font-medium text-gray-200">
           Contenido
         </Label>
         <Textarea
@@ -216,13 +215,13 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
           placeholder="Escribe aquí el contenido del anuncio..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="min-h-[120px]"
+          className="min-h-[120px] bg-[#252538] border-[#4c4c6d] text-white placeholder:text-gray-500 focus:border-[#00ffc3] focus:ring-[#00ffc3]"
           disabled={isSubmitting}
         />
       </div>
       
       <div className="space-y-2">
-        <Label className="block text-sm font-medium text-gray-700">
+        <Label className="block text-sm font-medium text-gray-200">
           Archivos adjuntos (opcional)
         </Label>
         
@@ -234,7 +233,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
           onDrop={handleDrop}
           onClick={triggerFileInput}
           className={`border-2 border-dashed rounded-lg p-6 cursor-pointer flex flex-col items-center justify-center transition-colors ${
-            dragActive ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary/50'
+            dragActive ? 'border-[#00ffc3] bg-[#00ffc3]/10' : 'border-[#4c4c6d] hover:border-[#00ffc3]/50'
           }`}
         >
           <input
@@ -248,7 +247,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
           />
           
           <FileUp className="h-10 w-10 text-gray-400 mb-2" />
-          <p className="text-sm text-gray-600 text-center">
+          <p className="text-sm text-gray-300 text-center">
             <span className="font-medium">
               Haz clic o arrastra archivos aquí
             </span>
@@ -262,18 +261,18 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
       {/* Selected files */}
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-200">
             Archivos seleccionados ({selectedFiles.length})
           </label>
           <div className="space-y-2">
             {selectedFiles.map((file, index) => (
-              <Card key={index} className="border border-gray-200">
+              <Card key={index} className="border border-[#4c4c6d] bg-[#252538]">
                 <CardContent className="p-3 flex justify-between items-center">
                   <div className="flex items-center">
-                    <File className="h-5 w-5 mr-2 text-blue-500" />
+                    <File className="h-5 w-5 mr-2 text-[#00ffc3]" />
                     <div>
-                      <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      <p className="text-sm font-medium text-gray-200">{file.name}</p>
+                      <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
                     </div>
                   </div>
                   <Button
@@ -282,7 +281,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
                     size="sm"
                     onClick={() => removeFile(index)}
                     disabled={isSubmitting}
-                    className="text-gray-500 hover:text-red-500"
+                    className="text-gray-400 hover:text-red-400"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -296,11 +295,16 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
       {/* Upload progress */}
       {isSubmitting && (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-200">
             Publicando anuncio...
           </label>
-          <Progress value={uploadProgress} className="h-2" />
-          <p className="text-xs text-gray-500 text-right">{uploadProgress}%</p>
+          <Progress value={uploadProgress} className="h-2 bg-[#252538]">
+            <div 
+              className="h-full bg-[#00ffc3]" 
+              style={{ width: `${uploadProgress}%` }} 
+            />
+          </Progress>
+          <p className="text-xs text-gray-400 text-right">{uploadProgress}%</p>
         </div>
       )}
       
@@ -311,10 +315,15 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({
           variant="outline"
           onClick={onCancel}
           disabled={isSubmitting}
+          className="border-[#4c4c6d] text-white hover:bg-[#252538]"
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button 
+          type="submit" 
+          disabled={isSubmitting}
+          className="bg-[#00ffc3] text-[#1E1E2F] hover:bg-[#00ffc3]/90"
+        >
           {isSubmitting ? 'Publicando...' : 'Publicar Anuncio'}
         </Button>
       </div>

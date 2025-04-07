@@ -1,235 +1,182 @@
 import React from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { File, Image, FileText, Download } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { File, FileText, Calendar } from 'lucide-react';
 
-// Actualizada la interfaz para incluir los attachments explícitamente
-export interface Announcement {
+// Define the announcement type
+interface Attachment {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  fileUrl: string;
+}
+
+interface RelatedItem {
+  type: 'assignment' | 'material';
+  id: string;
+  title: string;
+  description?: string;
+  dueDate?: string;
+  topicName: string;
+  attachments: Attachment[];
+}
+
+interface Announcement {
   id: string;
   title: string;
   content: string;
   authorId: string;
   authorName: string;
   authorAvatar?: string;
+  attachments: Attachment[];
+  relatedItem?: RelatedItem;
   createdAt: string;
-  attachments: Array<{
-    id: string;
-    fileName: string;
-    fileSize: number;
-    fileType: string;
-    fileUrl: string;
-  }>;
 }
-
-export const transformAnnouncement = (data: any): Announcement => {
-  return {
-    id: data.id,
-    title: data.title,
-    content: data.content,
-    authorId: data.author_id, // transformación de snake_case a camelCase
-    authorName: data.author_name,
-    authorAvatar: data.author_avatar,
-    createdAt: new Date(data.created_at).toISOString(), // o data.created_at si ya viene formateado
-    attachments: (data.attachments || []).map((att: any) => ({
-      id: att.id,
-      fileName: att.file_name,
-      fileSize: att.file_size,
-      fileType: att.file_type,
-      fileUrl: att.file_url,
-    }))
-  };
-};
 
 interface AnnouncementCardProps {
   announcement: Announcement;
 }
 
 const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement }) => {
-  const { title, content, authorName, authorAvatar, createdAt, attachments = [] } = announcement;
-  const { apiBaseUrl } = useAuth();
+  const navigate = useNavigate();
   
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase();
-  };
-  
-  // Safe date formatting with error handling
-  const formattedDate = React.useMemo(() => {
-    try {
-      if (!createdAt) return 'Unknown date';
-      // Handle both string and Date objects
-      const date = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
-      // Check if date is valid
-      if (isNaN(date.getTime())) return 'Invalid date';
-      return formatDistanceToNow(date, { addSuffix: true });
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Unknown date';
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) {
+      return <File className="h-4 w-4 text-blue-500" />;
     }
-  }, [createdAt]);
-  
-  // Función para formatear el tamaño del archivo
+    return <FileText className="h-4 w-4 text-blue-500" />;
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  // Función para obtener el icono adecuado según el tipo de archivo
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) {
-      return <Image className="h-5 w-5 text-blue-500" />;
-    } else if (fileType === 'application/pdf') {
-      return <FileText className="h-5 w-5 text-red-500" />;
-    } else {
-      return <File className="h-5 w-5 text-gray-500" />;
+  const formatCreatedDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: true, locale: es });
+    } catch (error) {
+      return "Fecha desconocida";
     }
   };
 
-  // Function for obtaining the URL complete of the file with safer handling
-  const getFullFileUrl = (fileUrl: string): string => {
-    if (!fileUrl) return '';
+  const getRelatedItemBadge = () => {
+    if (!announcement.relatedItem) return null;
     
-    // If the URL is already absolute, return it as is
-    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+    if (announcement.relatedItem.type === 'assignment') {
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Tarea</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Material</Badge>;
+    }
+  };
+
+  // Helper function to ensure file URLs are properly formatted
+  const getFullFileUrl = (fileUrl: string) => {
+    if (fileUrl.startsWith('http')) {
       return fileUrl;
     }
-    
-    // If API base URL is not available, return the relative path
-    if (!apiBaseUrl) {
-      console.warn('apiBaseUrl is not defined, returning relative path');
-      return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-    }
-    
-    // Combine API base URL with file path
-    const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
-    const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-    return `${baseUrl}${relativePath}`;
+    // Add the base API URL to relative paths
+    const baseApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    return fileUrl.startsWith('/') 
+      ? `${baseApiUrl}${fileUrl}`
+      : `${baseApiUrl}/${fileUrl}`;
   };
 
-  // Safer download function
-  const handleDownload = async (fileUrl: string, fileName: string, fileType: string) => {
-    if (!fileUrl) {
-      console.error('No file URL provided');
-      return;
-    }
-    
-    try {
-      // Obtener la URL completa del archivo
-      const fullUrl = getFullFileUrl(fileUrl);
-      
-      // Opción 1: Abrir el archivo en una nueva pestaña del navegador
-      if (fileType.startsWith('image/') || fileType === 'application/pdf') {
-        window.open(fullUrl, '_blank');
-        return;
-      }
-      
-      console.log('Descargando archivo desde:', fullUrl);
-      
-      // Opción 2: Para otros tipos de archivos, intentar descarga directa
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        credentials: 'include', // Incluir cookies para autenticación si es necesario
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-        cache: 'no-store',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-      
-      // Obtener el archivo como arrayBuffer en lugar de blob para mejor manejo binario
-      const arrayBuffer = await response.arrayBuffer();
-      const blob = new Blob([arrayBuffer], { type: fileType || 'application/octet-stream' });
-      
-      // Crear un objeto URL para el blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Crear un enlace temporal para la descarga
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      link.style.display = 'none';
-      
-      // Añadir el enlace al documento, hacer clic en él y luego eliminarlo
-      document.body.appendChild(link);
-      link.click();
-      
-      // Dar tiempo al navegador para iniciar la descarga
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-    } catch (error) {
-      console.error('Error al descargar el archivo:', error);
-      alert(`No se pudo descargar el archivo: ${fileName}. Detalles: ${error.message}`);
-    }
-  };
-  
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
-      <CardHeader className="flex flex-row items-center gap-4 pb-2">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={authorAvatar} alt={authorName || 'Author'} />
-          <AvatarFallback>{authorName ? getInitials(authorName) : 'UN'}</AvatarFallback>
-        </Avatar>
-        
-        <div className="flex flex-col">
-          <div className="font-medium">{authorName || 'Unknown author'}</div>
-          <div className="text-xs text-gray-500">{formattedDate}</div>
+    <Card className="mb-4 bg-[#1E1E2F]/80 border border-[#4c4c6d] text-white">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <div className="flex gap-3 items-center">
+            <Avatar className="h-10 w-10">
+              {announcement.authorAvatar ? (
+                <AvatarImage src={announcement.authorAvatar} alt={announcement.authorName} />
+              ) : (
+                <AvatarFallback>{announcement.authorName.charAt(0)}</AvatarFallback>
+              )}
+            </Avatar>
+            <div>
+              <CardTitle className="text-lg text-white">{announcement.title}</CardTitle>
+              <p className="text-sm text-gray-400">
+                {announcement.authorName} • {formatCreatedDate(announcement.createdAt)}
+              </p>
+            </div>
+          </div>
+          {getRelatedItemBadge()}
         </div>
       </CardHeader>
-      
-      <CardContent className="pb-4">
-        <h3 className="text-lg font-medium mb-2">{title}</h3>
-        <p className="text-gray-600 whitespace-pre-line mb-4">{content}</p>
+      <CardContent className="py-3">
+        <div className="whitespace-pre-wrap mb-4 text-gray-300">{announcement.content}</div>
         
-        {/* Render attachments with better error handling */}
-        {Array.isArray(attachments) && attachments.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <h4 className="text-sm font-medium text-gray-700">Archivos adjuntos:</h4>
-            <div className="space-y-2">
-              {attachments.map((attachment) => (
-                attachment && attachment.id ? (
-                  <div 
-                    key={attachment.id} 
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
-                  >
-                    <div className="flex items-center space-x-2">
-                      {getFileIcon(attachment.fileType || 'unknown')}
-                      <div>
-                        <p className="text-sm font-medium truncate max-w-[200px]">
-                          {attachment.fileName || 'Unnamed file'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatFileSize(attachment.fileSize || 0)}
-                        </p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 w-8 p-0 ml-2"
-                      onClick={() => handleDownload(
-                        attachment.fileUrl || '', 
-                        attachment.fileName || 'download', 
-                        attachment.fileType || 'application/octet-stream'
-                      )}
-                      disabled={!attachment.fileUrl}
+        {/* Related item (assignment or material) */}
+        {announcement.relatedItem && (
+          <div className="border border-[#4c4c6d] rounded-md p-4 mt-4 bg-[#252538]">
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="font-medium text-[#00ffc3]">
+                {announcement.relatedItem.type === 'assignment' ? 'Tarea:' : 'Material:'}
+                {' '}{announcement.relatedItem.title}
+              </h3>
+              <Badge variant="outline" className="border-[#4c4c6d] bg-[#1E1E2F] text-gray-300">{announcement.relatedItem.topicName}</Badge>
+            </div>
+            
+            {announcement.relatedItem.description && (
+              <p className="text-sm text-gray-300 mb-3">{announcement.relatedItem.description}</p>
+            )}
+            
+            {announcement.relatedItem.type === 'assignment' && announcement.relatedItem.dueDate && (
+              <div className="flex items-center text-sm text-gray-300 mb-3">
+                <Calendar className="h-4 w-4 mr-1" />
+                <span>Fecha de entrega: {new Date(announcement.relatedItem.dueDate).toLocaleDateString()}</span>
+              </div>
+            )}
+            
+            {announcement.relatedItem.attachments && announcement.relatedItem.attachments.length > 0 && (
+              <div className="mt-3">
+                <h4 className="text-sm font-medium text-gray-200 mb-2">Archivos adjuntos:</h4>
+                <div className="space-y-2">
+                  {announcement.relatedItem.attachments.map((attachment) => (
+                    <a 
+                      key={attachment.id}
+                      href={getFullFileUrl(attachment.fileUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center p-2 border border-[#4c4c6d] rounded bg-[#1E1E2F] hover:bg-[#2a2a3d] transition-colors"
                     >
-                      <Download className="h-4 w-4" />
-                      <span className="sr-only">Descargar</span>
-                    </Button>
-                  </div>
-                ) : null
+                      {getFileIcon(attachment.fileType)}
+                      <span className="ml-2 text-sm text-gray-300">{attachment.fileName}</span>
+                      <span className="ml-auto text-xs text-gray-400">{formatFileSize(attachment.fileSize)}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Regular announcement attachments */}
+        {announcement.attachments && announcement.attachments.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-200 mb-2">Archivos adjuntos:</h4>
+            <div className="space-y-2">
+              {announcement.attachments.map((attachment) => (
+                <a 
+                  key={attachment.id}
+                  href={getFullFileUrl(attachment.fileUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center p-2 border border-[#4c4c6d] rounded bg-[#252538] hover:bg-[#2a2a3d] transition-colors"
+                >
+                  {getFileIcon(attachment.fileType)}
+                  <span className="ml-2 text-sm text-gray-300">{attachment.fileName}</span>
+                  <span className="ml-auto text-xs text-gray-400">{formatFileSize(attachment.fileSize)}</span>
+                </a>
               ))}
             </div>
           </div>

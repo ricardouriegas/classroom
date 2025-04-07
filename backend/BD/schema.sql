@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS tbl_assignments (
   id VARCHAR(36) PRIMARY KEY,
   topic_id VARCHAR(36) NOT NULL,
   title VARCHAR(255) NOT NULL,
-  instructions TEXT NOT NULL,
+  description TEXT NOT NULL,
   due_date TIMESTAMP NOT NULL,
   created_by VARCHAR(36) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS tbl_assignment_submissions (
   submission_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   grade INT,
   is_graded BOOLEAN DEFAULT FALSE,
+  feedback TEXT DEFAULT NULL,
   FOREIGN KEY (assignment_id) REFERENCES tbl_assignments(id) ON DELETE CASCADE,
   FOREIGN KEY (student_id) REFERENCES tbl_users(id) ON DELETE CASCADE,
   UNIQUE KEY unique_submission (assignment_id, student_id)
@@ -145,3 +146,17 @@ CREATE TABLE IF NOT EXISTS tbl_submission_attachments (
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (submission_id) REFERENCES tbl_assignment_submissions(id) ON DELETE CASCADE
 );
+
+-- Add class_id to tbl_assignments
+ALTER TABLE tbl_assignments 
+ADD COLUMN class_id VARCHAR(36) NOT NULL AFTER id,
+ADD CONSTRAINT fk_assignments_class 
+FOREIGN KEY (class_id) REFERENCES tbl_classes(id) ON DELETE CASCADE;
+
+-- Rename instructions column to description in tbl_assignments
+ALTER TABLE tbl_assignments 
+CHANGE COLUMN instructions description TEXT NOT NULL;
+
+-- Add feedback column to tbl_assignment_submissions if it doesn't exist
+ALTER TABLE tbl_assignment_submissions
+ADD COLUMN feedback TEXT DEFAULT NULL;

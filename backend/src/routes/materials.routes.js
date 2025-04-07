@@ -5,9 +5,9 @@
 
 const express = require('express');
 const { pool } = require('../config/db');
-const authenticate = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
 const { upload, getFileUrl } = require('../utils/fileUpload');
-const crypto = require('crypto'); // Replace uuid with native crypto
+const crypto = require('crypto');
 
 // Create router
 const router = express.Router();
@@ -15,34 +15,83 @@ const router = express.Router();
 /**
  * Get all materials for a class
  */
-router.get('/class/:classId', authenticate, async (req, res) => {
-  const classId = req.params.classId;
-  const { id: userId, role: userRole } = req.user;
-
+router.get('/class/:classId', authMiddleware, async (req, res) => {
   try {
-    // Check access permissions
-    const accessValidator = new ClassAccessValidator(pool);
-    const hasAccess = await accessValidator.validateAccess(classId, userId, userRole);
+    const { classId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Check if the user has access to this class
+    let hasAccess = false;
     
+    if (userRole === 'teacher') {
+      const [teacherCheck] = await pool.query(
+        'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
+        [classId, userId]
+      );
+      hasAccess = teacherCheck.length > 0;
+    } else if (userRole === 'student') {
+      const [studentCheck] = await pool.query(
+        'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
+        [classId, userId]
+      );
+      hasAccess = studentCheck.length > 0;
+    }
+
     if (!hasAccess) {
       return res.status(403).json({
         error: {
-          message: 'Access denied: You do not have permission to view materials for this class',
+          message: 'You do not have access to this class',
           code: 'ACCESS_DENIED'
         }
       });
     }
 
-    // Get materials with related topic info
-    const materialsFetcher = new MaterialsFetcher(pool);
-    const formattedMaterials = await materialsFetcher.fetchClassMaterials(classId);
-    
+    // Get materials with topic info
+    const [materials] = await pool.query(`
+      SELECT m.*, t.name as topic_name 
+      FROM tbl_materials m
+      JOIN tbl_topics t ON m.topic_id = t.id
+      WHERE t.class_id = ?
+      ORDER BY m.created_at DESC
+    `, [classId]);
+
+    // Get attachments for each material
+    const formattedMaterials = [];
+    for (const material of materials) {
+      const [attachments] = await pool.query(`
+        SELECT id, file_name, file_size, file_type, file_path
+        FROM tbl_material_attachments
+        WHERE material_id = ?
+      `, [material.id]);
+
+      // Format attachments - map file_path to fileUrl for client consistency
+      const formattedAttachments = attachments.map(attachment => ({
+        id: attachment.id,
+        fileName: attachment.file_name,
+        fileSize: attachment.file_size,
+        fileType: attachment.file_type,
+        fileUrl: attachment.file_path
+      }));
+
+      // Format material
+      formattedMaterials.push({
+        id: material.id,
+        title: material.title,
+        description: material.description,
+        topicId: material.topic_id,
+        topicName: material.topic_name,
+        createdAt: material.created_at,
+        attachments: formattedAttachments
+      });
+    }
+
     res.json(formattedMaterials);
   } catch (error) {
-    console.error('❌ Error retrieving materials:', error);
+    console.error('Error getting materials:', error);
     res.status(500).json({
       error: {
-        message: 'Server error: Unable to retrieve materials',
+        message: 'Error retrieving materials',
         code: 'SERVER_ERROR'
       }
     });
@@ -51,217 +100,100 @@ router.get('/class/:classId', authenticate, async (req, res) => {
 
 /**
  * Create a new material
+ * @route   POST /api/materials
+ * @desc    Create a new material with attachments
+ * @access  Private (Teachers only)
  */
-router.post('/', authenticate, upload.array('attachments', 5), async (req, res) => {
-  const { title, description = null, topic_id } = req.body;
-  const userId = req.user.id;
-  const userRole = req.user.role;
-  const files = req.files || [];
-
+router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res) => {
   try {
+    console.log('Material creation request received:', req.body);
+    
+    const { title, description, topic_id, class_id } = req.body;
+    const userId = req.user.id;
+    const files = req.files || [];
+
+    // Debug logs
+    console.log('Material creation payload:', { 
+      title, 
+      description, 
+      topic_id, 
+      class_id, 
+      userID: userId,
+      filesCount: files.length 
+    });
+
     // Check if user is a teacher
-    if (userRole !== 'teacher') {
+    if (req.user.role !== 'teacher') {
       return res.status(403).json({
         error: {
-          message: 'Permission denied: Only teachers can create materials',
+          message: 'Only teachers can create materials',
           code: 'UNAUTHORIZED_ROLE'
         }
       });
     }
 
-    // Validate required fields
-    if (!title || !topic_id) {
+    // Validate input
+    if (!title || !topic_id || !class_id) {
       return res.status(400).json({
         error: {
-          message: 'Missing required fields: title and topic_id must be provided',
+          message: 'Title, topic ID, and class ID are required',
           code: 'MISSING_FIELDS'
         }
       });
     }
 
-    // Create material handler instance
-    const materialHandler = new MaterialHandler(pool);
+    // Check if topic exists and if the teacher has access to the class
+    const [topicCheck] = await pool.query(`
+      SELECT t.id, t.name, t.class_id, c.teacher_id 
+      FROM tbl_topics t
+      JOIN tbl_classes c ON t.class_id = c.id
+      WHERE t.id = ? AND t.class_id = ?
+    `, [topic_id, class_id]);
     
-    // Verify access to topic
-    const topicAccess = await materialHandler.verifyTopicAccess(topic_id, userId);
-    if (!topicAccess.hasAccess) {
-      return res.status(topicAccess.status).json({
+    if (topicCheck.length === 0) {
+      return res.status(404).json({
         error: {
-          message: topicAccess.message,
-          code: topicAccess.code
+          message: 'Topic not found or does not belong to this class',
+          code: 'TOPIC_NOT_FOUND'
         }
       });
     }
 
-    // Create material with attachments
-    const result = await materialHandler.createMaterial({
-      title,
-      description,
-      topicId: topic_id,
-      userId,
-      files
-    });
+    const topic = topicCheck[0];
     
-    res.status(201).json(result);
-  } catch (error) {
-    console.error('❌ Error creating material:', error);
-    res.status(500).json({
-      error: {
-        message: 'Server error: Failed to create material',
-        code: 'SERVER_ERROR'
-      }
-    });
-  }
-});
-
-/**
- * Helper class for access validation
- */
-class ClassAccessValidator {
-  constructor(dbPool) {
-    this.pool = dbPool;
-  }
-
-  async validateAccess(classId, userId, role) {
-    if (role === 'teacher') {
-      const [teacherCheck] = await this.pool.query(
-        'SELECT id FROM tbl_classes WHERE id = ? AND teacher_id = ?',
-        [classId, userId]
-      );
-      return teacherCheck.length > 0;
-    } else if (role === 'student') {
-      const [studentCheck] = await this.pool.query(
-        'SELECT id FROM tbl_class_enrollments WHERE class_id = ? AND student_id = ?',
-        [classId, userId]
-      );
-      return studentCheck.length > 0;
-    }
-    return false;
-  }
-}
-
-/**
- * Helper class to fetch materials
- */
-class MaterialsFetcher {
-  constructor(dbPool) {
-    this.pool = dbPool;
-  }
-
-  async fetchClassMaterials(classId) {
-    // Get materials with topic info
-    const [materials] = await this.pool.query(`
-      SELECT m.*, t.name as topic_name 
-      FROM tbl_materials m
-      JOIN tbl_topics t ON m.topic_id = t.id
-      WHERE t.class_id = ?
-      ORDER BY m.created_at DESC
-    `, [classId]);
-
-    // Fetch attachments for each material
-    const result = [];
-    for (const material of materials) {
-      const attachments = await this.fetchAttachments(material.id);
-      
-      result.push({
-        id: material.id,
-        title: material.title,
-        description: material.description,
-        topicId: material.topic_id,
-        topicName: material.topic_name,
-        createdAt: material.created_at,
-        attachments
-      });
-    }
-    
-    return result;
-  }
-
-  async fetchAttachments(materialId) {
-    const [attachments] = await this.pool.query(`
-      SELECT id, file_name, file_size, file_type, file_url
-      FROM tbl_material_attachments
-      WHERE material_id = ?
-    `, [materialId]);
-
-    return attachments.map(attachment => ({
-      id: attachment.id,
-      fileName: attachment.file_name,
-      fileSize: attachment.file_size,
-      fileType: attachment.file_type,
-      fileUrl: attachment.file_url
-    }));
-  }
-}
-
-/**
- * Helper class to handle material creation
- */
-class MaterialHandler {
-  constructor(dbPool) {
-    this.pool = dbPool;
-  }
-
-  async verifyTopicAccess(topicId, userId) {
-    try {
-      // Check if topic exists and if user has access
-      const [topicCheck] = await this.pool.query(`
-        SELECT t.id, t.class_id, c.teacher_id 
-        FROM tbl_topics t
-        JOIN tbl_classes c ON t.class_id = c.id
-        WHERE t.id = ?
-      `, [topicId]);
-      
-      if (topicCheck.length === 0) {
-        return {
-          hasAccess: false,
-          status: 404,
-          message: 'Topic not found',
-          code: 'TOPIC_NOT_FOUND'
-        };
-      }
-
-      const topic = topicCheck[0];
-      
-      if (topic.teacher_id !== userId) {
-        return {
-          hasAccess: false,
-          status: 403,
+    // Check if the teacher owns the class
+    if (topic.teacher_id !== userId) {
+      return res.status(403).json({
+        error: {
           message: 'You do not have permission to add materials to this class',
           code: 'ACCESS_DENIED'
-        };
-      }
-
-      return { hasAccess: true };
-    } catch (error) {
-      throw error;
+        }
+      });
     }
-  }
 
-  async createMaterial({ title, description, topicId, userId, files }) {
-    // Start transaction
-    const connection = await this.pool.getConnection();
+    // Begin transaction
+    const connection = await pool.getConnection();
     await connection.beginTransaction();
 
     try {
-      // Generate ID for material
-      const materialId = crypto.randomUUID(); // Use crypto instead of generateUuid
+      // Generate a unique material ID
+      const materialId = crypto.randomUUID();
       
-      // Insert material record
+      // Insert material into database
       await connection.query(
         'INSERT INTO tbl_materials (id, topic_id, title, description, created_by) VALUES (?, ?, ?, ?, ?)',
-        [materialId, topicId, title, description, userId]
+        [materialId, topic_id, title, description || null, userId]
       );
 
-      // Process attachments
+      // Process material attachments
       const attachments = [];
       for (const file of files) {
-        const attachmentId = crypto.randomUUID(); // Use crypto instead of generateUuid
-        const fileUrl = getFileUrl(file.filename);
+        const attachmentId = crypto.randomUUID();
+        const filePath = getFileUrl(file.filename);
         
         await connection.query(
-          'INSERT INTO tbl_material_attachments (id, material_id, file_name, file_path, file_size, file_type) VALUES (?, ?, ?, ?, ?, ?)',
-          [attachmentId, materialId, file.originalname, fileUrl, file.size, file.mimetype]
+          'INSERT INTO tbl_material_attachments (id, material_id, file_name, file_size, file_type, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+          [attachmentId, materialId, file.originalname, file.size, file.mimetype, filePath]
         );
         
         attachments.push({
@@ -269,36 +201,51 @@ class MaterialHandler {
           fileName: file.originalname,
           fileSize: file.size,
           fileType: file.mimetype,
-          fileUrl: fileUrl
+          fileUrl: filePath
         });
       }
 
-      // Get topic name
-      const [topicInfo] = await connection.query(
-        'SELECT name FROM tbl_topics WHERE id = ?',
-        [topicId]
+      // Create an announcement for this material
+      const announcementId = crypto.randomUUID();
+      const announcementTitle = `Nuevo material: ${title}`;
+      const announcementContent = `Se ha publicado nuevo material de estudio para el tema "${topic.name}".`;
+      
+      await connection.query(
+        'INSERT INTO tbl_announcements (id, class_id, teacher_id, title, content) VALUES (?, ?, ?, ?, ?)',
+        [announcementId, class_id, userId, announcementTitle, announcementContent]
       );
 
-      // Commit transaction
       await connection.commit();
 
-      // Return formatted response
-      return {
+      // Format response
+      const material = {
         id: materialId,
         title,
-        description,
-        topicId,
-        topicName: topicInfo[0].name,
+        description: description || null,
+        topicId: topic_id,
+        topicName: topic.name,
         createdAt: new Date(),
         attachments
       };
+
+      console.log('Material created successfully:', materialId);
+      res.status(201).json(material);
     } catch (error) {
       await connection.rollback();
+      console.error('Database error during material creation:', error);
       throw error;
     } finally {
       connection.release();
     }
+  } catch (error) {
+    console.error('Error creating material:', error);
+    res.status(500).json({
+      error: {
+        message: 'Error creating material: ' + error.message,
+        code: 'SERVER_ERROR'
+      }
+    });
   }
-}
+});
 
 module.exports = router;

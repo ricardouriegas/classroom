@@ -1,44 +1,64 @@
 import React, { useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth, api } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { FileUp, X, FileText, AlertCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { FileUp, X, File, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface AssignmentSubmissionFormProps {
-  assignmentId: string;
-  existingFiles?: Array<{
+interface Topic {
+  id: string;
+  name: string;
+}
+
+interface Material {
+  id: string;
+  title: string;
+  description: string;
+  topicId: string;
+  topicName: string;
+  createdAt: string;
+  attachments: Array<{
     id: string;
     fileName: string;
     fileSize: number;
     fileType: string;
     fileUrl: string;
   }>;
-  existingComment?: string;
-  onSubmissionComplete: () => void;
+}
+
+interface MaterialFormProps {
+  classId: string;
+  topics: Topic[];
+  onMaterialCreated: (material: Material) => void;
   onCancel: () => void;
 }
 
-const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
-  assignmentId,
-  existingFiles = [],
-  existingComment = '',
-  onSubmissionComplete,
-  onCancel,
+const MaterialForm: React.FC<MaterialFormProps> = ({ 
+  classId, 
+  topics,
+  onMaterialCreated, 
+  onCancel 
 }) => {
+  const { currentUser } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [comment, setComment] = useState(existingComment);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [topicId, setTopicId] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -101,10 +121,19 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (selectedFiles.length === 0 && !existingFiles.length) {
+    if (!title.trim()) {
       toast({
         title: 'Error',
-        description: 'Debes adjuntar al menos un archivo a tu entrega.',
+        description: 'Por favor, ingresa un título para el material.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!topicId) {
+      toast({
+        title: 'Error',
+        description: 'Por favor, selecciona un tema para el material.',
         variant: 'destructive',
       });
       return;
@@ -115,10 +144,13 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
       setUploadProgress(10);
       
       const formData = new FormData();
-      formData.append('comment', comment || '');
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('topic_id', topicId);
+      formData.append('class_id', classId);
       
       selectedFiles.forEach(file => {
-        formData.append('files', file);
+        formData.append('attachments', file);
       });
       
       const intervalId = setInterval(() => {
@@ -128,7 +160,16 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
         });
       }, 300);
       
-      const response = await api.post(`/assignments/${assignmentId}/submit`, formData, {
+      // Log the request details for debugging
+      console.log('Sending material creation request:', {
+        endpoint: '/materials',
+        classId,
+        topicId,
+        title,
+        files: selectedFiles.length
+      });
+      
+      const response = await api.post('/materials', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -137,24 +178,24 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
       clearInterval(intervalId);
       setUploadProgress(100);
       
-      toast({
-        title: 'Entrega exitosa',
-        description: 'Tu tarea ha sido entregada correctamente.',
-      });
+      console.log('Material created:', response.data);
       
-      setTimeout(() => {
-        onSubmissionComplete();
-      }, 1000);
+      // Pass the created material back to the parent component
+      onMaterialCreated(response.data);
     } catch (error) {
-      console.error('Error submitting assignment:', error);
+      console.error('Error creating material:', error);
+      // More detailed error logging
+      if (error.response) {
+        console.error('Error response:', error.response.status, error.response.data);
+      }
       toast({
         title: 'Error',
-        description: 'No se pudo entregar la tarea. Por favor, inténtalo de nuevo.',
+        description: 'No se pudo crear el material. Por favor, inténtalo de nuevo.',
         variant: 'destructive',
       });
-      setUploadProgress(0);
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -171,23 +212,59 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <label htmlFor="comment" className="block text-sm font-medium text-gray-200">
-          Comentarios para el profesor (opcional)
-        </label>
+        <Label htmlFor="title" className="text-sm font-medium text-gray-200">
+          Título del material
+        </Label>
+        <Input
+          id="title"
+          placeholder="Título del material"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={isSubmitting}
+          className="w-full bg-[#252538] border-[#4c4c6d] text-white placeholder:text-gray-500 focus:border-[#00ffc3] focus:ring-[#00ffc3]"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="topic" className="text-sm font-medium text-gray-200">
+          Tema
+        </Label>
+        <Select
+          value={topicId}
+          onValueChange={setTopicId}
+          disabled={isSubmitting}
+        >
+          <SelectTrigger className="w-full bg-[#252538] border-[#4c4c6d] text-white">
+            <SelectValue placeholder="Selecciona un tema" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#2f2f42] text-white border-[#4c4c6d]">
+            {topics.map((topic) => (
+              <SelectItem key={topic.id} value={topic.id}>
+                {topic.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="description" className="block text-sm font-medium text-gray-200">
+          Descripción (opcional)
+        </Label>
         <Textarea
-          id="comment"
-          placeholder="Agrega un comentario sobre tu entrega..."
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          className="min-h-[100px] bg-[#252538] border-[#4c4c6d] text-white placeholder:text-gray-500 focus:border-[#00ffc3] focus:ring-[#00ffc3]"
+          id="description"
+          placeholder="Describe este material de estudio..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="min-h-[120px] bg-[#252538] border-[#4c4c6d] text-white placeholder:text-gray-500 focus:border-[#00ffc3] focus:ring-[#00ffc3]"
           disabled={isSubmitting}
         />
       </div>
       
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-200">
+        <Label className="block text-sm font-medium text-gray-200">
           Archivos adjuntos
-        </label>
+        </Label>
         
         {/* File drop zone */}
         <div
@@ -205,7 +282,7 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
             type="file"
             onChange={handleFileChange}
             multiple
-            accept=".pdf,.jpg,.jpeg,.png,.gif"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.ppt,.pptx"
             className="hidden"
             disabled={isSubmitting}
           />
@@ -217,40 +294,12 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
             </span>
           </p>
           <p className="text-xs text-gray-500 mt-1 text-center">
-            PDF, JPG, PNG, GIF (máx. 5MB)
+            PDF, Word, PowerPoint, imágenes (máx. 5MB)
           </p>
         </div>
       </div>
       
-      {/* Existing files */}
-      {existingFiles.length > 0 && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-200">
-            Archivos ya subidos
-          </label>
-          <div className="space-y-2">
-            {existingFiles.map((file) => (
-              <Card key={file.id} className="border border-[#4c4c6d] bg-[#252538]/70">
-                <CardContent className="p-3 flex justify-between items-center">
-                  <div className="flex items-center">
-                    <FileText className="h-5 w-5 mr-2 text-[#00ffc3]" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-200">{file.fileName}</p>
-                      <p className="text-xs text-gray-400">{formatFileSize(file.fileSize)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <p className="text-xs text-amber-400 flex items-center">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Estos archivos serán reemplazados por los nuevos que subas
-          </p>
-        </div>
-      )}
-      
-      {/* Selected new files */}
+      {/* Selected files */}
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-200">
@@ -261,7 +310,7 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
               <Card key={index} className="border border-[#4c4c6d] bg-[#252538]">
                 <CardContent className="p-3 flex justify-between items-center">
                   <div className="flex items-center">
-                    <FileText className="h-5 w-5 mr-2 text-[#00ffc3]" />
+                    <File className="h-5 w-5 mr-2 text-[#00ffc3]" />
                     <div>
                       <p className="text-sm font-medium text-gray-200">{file.name}</p>
                       <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
@@ -288,14 +337,9 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
       {isSubmitting && (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-200">
-            Subiendo archivos...
+            Subiendo material...
           </label>
-          <Progress value={uploadProgress} className="h-2 bg-[#252538]">
-            <div 
-              className="h-full bg-[#00ffc3]" 
-              style={{ width: `${uploadProgress}%` }} 
-            />
-          </Progress>
+          <Progress value={uploadProgress} className="h-2 bg-[#252538]" />
           <p className="text-xs text-gray-400 text-right">{uploadProgress}%</p>
         </div>
       )}
@@ -316,11 +360,11 @@ const AssignmentSubmissionForm: React.FC<AssignmentSubmissionFormProps> = ({
           disabled={isSubmitting}
           className="bg-[#00ffc3] text-[#1E1E2F] hover:bg-[#00ffc3]/90"
         >
-          {isSubmitting ? 'Enviando...' : 'Entregar tarea'}
+          {isSubmitting ? 'Subiendo...' : 'Publicar Material'}
         </Button>
       </div>
     </form>
   );
 };
 
-export default AssignmentSubmissionForm;
+export default MaterialForm;

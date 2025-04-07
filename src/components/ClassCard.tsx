@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -52,7 +51,7 @@ const ClassCard: React.FC<ClassCardProps> = ({ classData }) => {
 
   return (
     <Link to={`/class/${classData.id}`} className="block h-full transition-transform hover:scale-105">
-      <Card className="h-full border overflow-hidden hover:shadow-md transition-shadow">
+      <Card className="h-full border border-[#4c4c6d] bg-[#1E1E2F]/80 text-white overflow-hidden hover:shadow-md transition-shadow">
         <div 
           className="h-24 flex items-center justify-center p-4 text-white font-bold text-xl text-center"
           style={{ backgroundColor: cardColor }}
@@ -60,12 +59,12 @@ const ClassCard: React.FC<ClassCardProps> = ({ classData }) => {
           {classData.name}
         </div>
         <CardContent className="pt-4">
-          <div className="text-sm text-gray-500 mb-2">{classData.career_name} • {classData.semester}</div>
+          <div className="text-sm text-gray-400 mb-2">{classData.career_name} • {classData.semester}</div>
           {classData.description && (
-            <p className="text-sm text-gray-700 line-clamp-2">{classData.description}</p>
+            <p className="text-sm text-gray-300 line-clamp-2">{classData.description}</p>
           )}
         </CardContent>
-        <CardFooter className="border-t p-4 text-xs text-gray-500 flex justify-between">
+        <CardFooter className="border-t border-[#4c4c6d] p-4 text-xs text-gray-400 flex justify-between">
           <div className="flex items-center">
             <BookOpen className="h-3 w-3 mr-1" />
             <span>{classData.class_code}</span>

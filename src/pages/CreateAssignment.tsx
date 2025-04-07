@@ -211,7 +211,7 @@ const CreateAssignment = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <Navbar />
       <div className="container mx-auto py-8 px-4">
         <Button 
@@ -361,7 +361,7 @@ const CreateAssignment = () => {
                       <div className="flex items-center justify-center w-full">
                         <label
                           htmlFor="file-upload"
-                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50"
+                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer "
                         >
                           <div className="flex flex-col items-center justify-center pt-5 pb-6">
                             <FileText className="w-8 h-8 mb-2 text-gray-400" />
@@ -429,6 +429,11 @@ const CreateAssignment = () => {
                     {isSubmitting ? 'Creando...' : 'Crear Tarea'}
                   </Button>
                 </div>
+                {isSubmitting && (
+                  <div className="mt-4">
+                    <Progress value={uploadProgress} className="h-2 bg-[#252538]" />
+                  </div>
+                )}
               </form>
             </Form>
           </CardContent>

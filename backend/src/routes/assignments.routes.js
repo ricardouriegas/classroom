@@ -59,20 +59,23 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
       assignments = teacherAssignments;
     } else {
       // For students, include submission status
-      const [studentAssignments] = await pool.query(`
+      // First check if feedback column exists in the table
+      let query = `
         SELECT a.*, t.name as topic_name, 
                CASE 
                  WHEN s.id IS NOT NULL THEN 'submitted' 
                  WHEN a.due_date < NOW() THEN 'expired'
                  ELSE 'pending' 
                END as status,
-               s.submission_date, s.grade, s.feedback
+               s.submission_date, s.grade
         FROM tbl_assignments a
         JOIN tbl_topics t ON a.topic_id = t.id
         LEFT JOIN tbl_assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
         WHERE t.class_id = ?
         ORDER BY a.due_date DESC
-      `, [userId, classId]);
+      `;
+
+      const [studentAssignments] = await pool.query(query, [userId, classId]);
       
       assignments = studentAssignments;
     }
@@ -81,7 +84,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
     const formattedAssignments = [];
     for (const assignment of assignments) {
       const [attachments] = await pool.query(`
-        SELECT id, file_name, file_size, file_type, file_url
+        SELECT id, file_name, file_size, file_type, file_path
         FROM tbl_assignment_attachments
         WHERE assignment_id = ?
       `, [assignment.id]);
@@ -92,10 +95,10 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
         fileName: attachment.file_name,
         fileSize: attachment.file_size,
         fileType: attachment.file_type,
-        fileUrl: attachment.file_url
+        fileUrl: attachment.file_path
       }));
 
-      // Format assignment
+      // Format assignment - handle feedback field carefully
       formattedAssignments.push({
         id: assignment.id,
         classId: assignment.class_id,
@@ -110,7 +113,7 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
         status: assignment.status,
         submissionDate: assignment.submission_date,
         grade: assignment.grade,
-        feedback: assignment.feedback,
+        feedback: assignment.feedback || null, // Handle missing feedback column
         // Teacher-specific fields
         submissionsCount: assignment.submissions_count
       });
@@ -118,6 +121,79 @@ router.get('/class/:classId', authMiddleware, async (req, res) => {
 
     res.json(formattedAssignments);
   } catch (error) {
+    // Check if the error is specifically about the feedback column
+    if (error.code === 'ER_BAD_FIELD_ERROR' && error.sqlMessage.includes('s.feedback')) {
+      // Try again without the feedback column
+      try {
+        const { classId } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        
+        let assignments = [];
+        
+        // Simplified query without feedback column
+        const [studentAssignments] = await pool.query(`
+          SELECT a.*, t.name as topic_name, 
+                 CASE 
+                   WHEN s.id IS NOT NULL THEN 'submitted' 
+                   WHEN a.due_date < NOW() THEN 'expired'
+                   ELSE 'pending' 
+                 END as status,
+                 s.submission_date, s.grade
+          FROM tbl_assignments a
+          JOIN tbl_topics t ON a.topic_id = t.id
+          LEFT JOIN tbl_assignment_submissions s ON a.id = s.assignment_id AND s.student_id = ?
+          WHERE t.class_id = ?
+          ORDER BY a.due_date DESC
+        `, [userId, classId]);
+        
+        assignments = studentAssignments;
+        
+        // Process the assignments without the feedback field
+        const formattedAssignments = await Promise.all(assignments.map(async (assignment) => {
+          const [attachments] = await pool.query(`
+            SELECT id, file_name, file_size, file_type, file_path
+            FROM tbl_assignment_attachments
+            WHERE assignment_id = ?
+          `, [assignment.id]);
+
+          const formattedAttachments = attachments.map(attachment => ({
+            id: attachment.id,
+            fileName: attachment.file_name,
+            fileSize: attachment.file_size,
+            fileType: attachment.file_type,
+            fileUrl: attachment.file_path
+          }));
+
+          return {
+            id: assignment.id,
+            classId: assignment.class_id,
+            topicId: assignment.topic_id,
+            topicName: assignment.topic_name,
+            title: assignment.title,
+            description: assignment.description,
+            dueDate: assignment.due_date,
+            createdAt: assignment.created_at,
+            attachments: formattedAttachments,
+            status: assignment.status,
+            submissionDate: assignment.submission_date,
+            grade: assignment.grade,
+            feedback: null // No feedback available
+          };
+        }));
+
+        return res.json(formattedAssignments);
+      } catch (fallbackError) {
+        console.error('Error in fallback query:', fallbackError);
+        return res.status(500).json({
+          error: {
+            message: 'Error retrieving assignments',
+            code: 'SERVER_ERROR'
+          }
+        });
+      }
+    }
+
     console.error('Error getting assignments:', error);
     res.status(500).json({
       error: {
@@ -189,7 +265,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
 
     // Check if the topic exists and belongs to the class
     const [topicCheck] = await pool.query(
-      'SELECT id FROM tbl_topics WHERE id = ? AND class_id = ?',
+      'SELECT id, name FROM tbl_topics WHERE id = ? AND class_id = ?',
       [topic_id, class_id]
     );
     
@@ -205,26 +281,30 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
     // Generate a unique assignment ID
     const assignmentId = crypto.randomUUID();
     
+    // Format date for MySQL (YYYY-MM-DD HH:MM:SS)
+    const formattedDueDate = dueDate.toISOString().slice(0, 19).replace('T', ' ');
+    
     // Begin transaction
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
     try {
-      // Insert assignment into database
+      // Update the INSERT statement to include class_id
       await connection.query(
-        'INSERT INTO tbl_assignments (id, topic_id, title, instructions, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        [assignmentId, topic_id, title, description, due_date, userId]
+        'INSERT INTO tbl_assignments (id, class_id, topic_id, title, description, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [assignmentId, class_id, topic_id, title, description, formattedDueDate, userId]
       );
 
       // Process file attachments
       const attachments = [];
       for (const file of files) {
         const attachmentId = crypto.randomUUID();
-        const fileUrl = getFileUrl(file.filename);
+        const filePath = getFileUrl(file.filename);
         
+        // Changed file_url to file_path to match the database schema
         await connection.query(
-          'INSERT INTO tbl_assignment_attachments (id, assignment_id, file_name, file_path, file_size, file_type, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          [attachmentId, assignmentId, file.originalname, fileUrl, file.size, file.mimetype]
+          'INSERT INTO tbl_assignment_attachments (id, assignment_id, file_name, file_size, file_type, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+          [attachmentId, assignmentId, file.originalname, file.size, file.mimetype, filePath]
         );
         
         attachments.push({
@@ -232,24 +312,28 @@ router.post('/', authMiddleware, upload.array('attachments', 5), async (req, res
           fileName: file.originalname,
           fileSize: file.size,
           fileType: file.mimetype,
-          fileUrl: fileUrl
+          fileUrl: filePath // Keep fileUrl in the response to maintain API consistency
         });
       }
 
-      await connection.commit();
-
-      // Get topic name for response
-      const [topicInfo] = await pool.query(
-        'SELECT name FROM tbl_topics WHERE id = ?',
-        [topic_id]
+      // Create an announcement for this assignment
+      const announcementId = crypto.randomUUID();
+      const announcementTitle = `Nueva tarea: ${title}`;
+      const announcementContent = `Se ha publicado una nueva tarea para el tema "${topicCheck[0].name}". Fecha de entrega: ${new Date(due_date).toLocaleDateString()}.`;
+      
+      await connection.query(
+        'INSERT INTO tbl_announcements (id, class_id, teacher_id, title, content) VALUES (?, ?, ?, ?, ?)',
+        [announcementId, class_id, userId, announcementTitle, announcementContent]
       );
+
+      await connection.commit();
 
       // Format response
       const assignment = {
         id: assignmentId,
         classId: class_id,
         topicId: topic_id,
-        topicName: topicInfo[0].name,
+        topicName: topicCheck[0].name,
         title,
         description,
         dueDate: due_date,
@@ -385,11 +469,12 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
       const submissionFiles = [];
       for (const file of files) {
         const fileId = crypto.randomUUID();
-        const fileUrl = getFileUrl(file.filename);
+        const filePath = getFileUrl(file.filename);
         
+        // Changed file_url to file_path to match the database schema
         await connection.query(
-          'INSERT INTO tbl_submission_attachments (id, submission_id, file_name, file_size, file_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
-          [fileId, submissionId, file.originalname, file.size, file.mimetype, fileUrl]
+          'INSERT INTO tbl_submission_attachments (id, submission_id, file_name, file_size, file_type, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+          [fileId, submissionId, file.originalname, file.size, file.mimetype, filePath]
         );
         
         submissionFiles.push({
@@ -397,7 +482,7 @@ router.post('/:id/submit', authMiddleware, upload.array('files', 5), async (req,
           fileName: file.originalname,
           fileSize: file.size,
           fileType: file.mimetype,
-          fileUrl: fileUrl
+          fileUrl: filePath // Keep fileUrl in the response to maintain API consistency
         });
       }
 
@@ -472,18 +557,18 @@ router.get('/student', authMiddleware, async (req, res) => {
     const formattedAssignments = await Promise.all(assignments.map(async (assignment) => {
       // Get assignment attachments
       const [attachments] = await pool.query(`
-        SELECT id, file_name, file_size, file_type, file_url
+        SELECT id, file_name, file_size, file_type, file_path
         FROM tbl_assignment_attachments
         WHERE assignment_id = ?
       `, [assignment.id]);
 
-      // Format attachments
+      // Format attachments - map file_path to fileUrl for client consistency
       const formattedAttachments = attachments.map(attachment => ({
         id: attachment.id,
         fileName: attachment.file_name,
         fileSize: attachment.file_size,
         fileType: attachment.file_type,
-        fileUrl: attachment.file_url
+        fileUrl: attachment.file_path // Map file_path to fileUrl for API consistency
       }));
 
       // Get submission files if this assignment has been submitted
@@ -496,7 +581,7 @@ router.get('/student', authMiddleware, async (req, res) => {
         
         if (submission.length > 0) {
           const [files] = await pool.query(`
-            SELECT id, file_name, file_size, file_type, file_url
+            SELECT id, file_name, file_size, file_type, file_path
             FROM tbl_submission_attachments
             WHERE submission_id = ?
           `, [submission[0].id]);
@@ -506,7 +591,7 @@ router.get('/student', authMiddleware, async (req, res) => {
             fileName: file.file_name,
             fileSize: file.file_size,
             fileType: file.file_type,
-            fileUrl: file.file_url
+            fileUrl: file.file_path // Map file_path to fileUrl for API consistency
           }));
         }
       }
@@ -593,7 +678,7 @@ router.get('/:id/submissions', authMiddleware, async (req, res) => {
     const formattedSubmissions = await Promise.all(submissions.map(async (submission) => {
       // Get submission files
       const [files] = await pool.query(`
-        SELECT id, file_name, file_size, file_type, file_url
+        SELECT id, file_name, file_size, file_type, file_path
         FROM tbl_submission_attachments
         WHERE submission_id = ?
       `, [submission.id]);
@@ -603,7 +688,7 @@ router.get('/:id/submissions', authMiddleware, async (req, res) => {
         fileName: file.file_name,
         fileSize: file.file_size,
         fileType: file.file_type,
-        fileUrl: file.file_url
+        fileUrl: file.file_path // Map file_path to fileUrl for API consistency
       }));
 
       return {
